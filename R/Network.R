@@ -73,6 +73,17 @@ Network <- function(jaspResults, dataset = NULL, options) {
   sapply(options[["problems"]], function(p) p[["problemName"]])
 }
 
+.ln1NetFindSelfLoops <- function(edgelistOptions) {
+  loops <- character(0)
+  for (path in edgelistOptions[["connections"]]) {
+    from <- path[["connectionFrom"]]
+    to   <- path[["connectionTo"]]
+    if (from != "" && to != "" && from == to)
+      loops <- c(loops, from)
+  }
+  return(unique(loops))
+}
+
 .ln1NetCheckEdgelist <- function(edgelistOptions, nodeNames = NULL) {
   return(all(sapply(edgelistOptions[["connections"]], function(path) {
     from <- path[["connectionFrom"]]
@@ -109,10 +120,14 @@ Network <- function(jaspResults, dataset = NULL, options) {
       edgelistName <- edgelistOptions[["name"]]
       if (is.null(jaspResults[["centralityContainer"]][[edgelistName]])) {
         if (.ln1NetCheckEdgelist(edgelistOptions, .ln1NetNodeNames(options))) {
+          edgelist <- jaspResults[["edgelistContainer"]][[edgelistName]]$object
+          usedNodes <- unique(c(edgelist[["from"]], edgelist[["to"]]))
+          nodeAttrs <- jaspResults[["nodeAttributesState"]]$object
+          nodeAttrs <- nodeAttrs[nodeAttrs[["name"]] %in% usedNodes, , drop = FALSE]
           centralityState <- createJaspState(
             .ln1NetCentralitySingle(
-              jaspResults[["edgelistContainer"]][[edgelistName]]$object,
-              jaspResults[["nodeAttributesState"]]$object,
+              edgelist,
+              nodeAttrs,
               options
             )
           )
@@ -177,9 +192,10 @@ Network <- function(jaspResults, dataset = NULL, options) {
   }
 
   if (!is.null(jaspResults[["edgelistContainer"]]) && length(jaspResults[["edgelistContainer"]]) > 0) {
+    nodeNames <- .ln1NetNodeNames(options)
     for (i in seq_along(options[["connectionList"]])) {
       edgelistOptions <- options[["connectionList"]][[i]]
-      if (edgelistOptions[["plotNetwork"]] && .ln1NetCheckEdgelist(edgelistOptions, .ln1NetNodeNames(options))) {
+      if (edgelistOptions[["plotNetwork"]]) {
         edgelistName <- edgelistOptions[["name"]]
         dataPlot <- createJaspPlot(
           title = edgelistName,
@@ -197,11 +213,25 @@ Network <- function(jaspResults, dataset = NULL, options) {
             c("connectionList", i, "plotNetwork")
           )
         )
-        dataPlot$plotObject <- .ln1NetCreateNetworkPlotFill(
-          jaspResults[["edgelistContainer"]][[edgelistName]]$object,
-          jaspResults[["nodeAttributesState"]]$object,
-          options
-        )
+
+        selfLoops <- .ln1NetFindSelfLoops(edgelistOptions)
+        if (length(selfLoops) > 0) {
+          dataPlot$setError(gettextf(
+            "A problem cannot be connected to itself. Please fix: %s.",
+            paste(selfLoops, collapse = ", ")
+          ))
+        } else if (.ln1NetCheckEdgelist(edgelistOptions, nodeNames)) {
+          edgelist <- jaspResults[["edgelistContainer"]][[edgelistName]]$object
+          usedNodes <- unique(c(edgelist[["from"]], edgelist[["to"]]))
+          nodeAttrs <- jaspResults[["nodeAttributesState"]]$object
+          nodeAttrs <- nodeAttrs[nodeAttrs[["name"]] %in% usedNodes, , drop = FALSE]
+          dataPlot$plotObject <- .ln1NetCreateNetworkPlotFill(
+            edgelist,
+            nodeAttrs,
+            options
+          )
+        }
+
         jaspResults[["networkPlotContainer"]][[edgelistName]] <- dataPlot
       }
     }
