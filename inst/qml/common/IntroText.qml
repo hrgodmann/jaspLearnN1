@@ -25,4 +25,6 @@ CheckBox
 {
 	name: "enableIntroText"
 	label: qsTr("Introductory text")
+	checked: true
+	info: qsTr("Displays an introductory explanation of the analysis.")
 }

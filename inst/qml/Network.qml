@@ -44,6 +44,7 @@ Form
 		minRows: 2
 		maxRows: 10
 		rowComponentTitle: "Severity"
+		info: qsTr("Define the problems (symptoms) and their severity. Use the slider to set the severity of each problem between 0 and 1.")
 
 		rowComponent: Slider
 		{
@@ -52,6 +53,7 @@ Form
 			min: 0
 			max: 1
 			vertical: false
+			info: qsTr("The severity of this problem, ranging from 0 (none) to 1 (maximum).")
 		}
 	}
 
@@ -63,6 +65,7 @@ Form
 		maximumItems: 10
 		newItemName: qsTr("Time ") + (connectionList.count + 1)
 		optionKey: "name"
+		info: qsTr("Each tab represents a time point. Define the connections between problems and their strengths for each time point.")
 		content: Group
 		{
 			childControlsArea.anchors.leftMargin: jaspTheme.contentMargin
@@ -76,6 +79,7 @@ Form
 				minimumItems: 0
 				maximumItems: 20
 				headerLabels: [qsTr("From"), qsTr("To"), qsTr("Strength")]
+				info: qsTr("Define the directed connections between problems. Select the source and target problems, and set the strength of each connection.")
 				defaultValues: connectionList.count === 1 ? [
 					{"connectionFrom": qsTr("Problem 1"), "connectionTo": qsTr("Problem 2"), "connectionStrength": 0.5},
 					{"connectionFrom": qsTr("Problem 2"), "connectionTo": qsTr("Problem 3"), "connectionStrength": -0.5},
@@ -93,6 +97,7 @@ Form
 						name: "connectionFrom"
 						source: problems
 						addEmptyValue: true
+						info: qsTr("The source problem of this connection.")
 						onCurrentValueChanged:
 						{
 							if (to.currentValue == currentValue)
@@ -111,6 +116,7 @@ Form
 						name: "connectionTo"
 						source: problems
 						addEmptyValue: true
+						info: qsTr("The target problem of this connection.")
 						onCurrentValueChanged:
 						{
 							if (from.currentValue == currentValue)
@@ -130,6 +136,7 @@ Form
 						min: -1
 						max: 1
 						vertical: false
+						info: qsTr("The strength of this connection, ranging from -1 (strong negative) to 1 (strong positive).")
 					}
 				}
 			}
@@ -137,6 +144,7 @@ Form
 			Group
 			{
 				title: qsTr("Options")
+				info: qsTr("Output options for this time point.")
 
 				columns: 2
 
@@ -145,6 +153,7 @@ Form
 					name: "plotNetwork"
 					label: qsTr("Network plot")
 					checked: true
+					info: qsTr("Displays a network plot for this time point showing problems as nodes and connections as edges.")
 				}
 
 				CheckBox
@@ -152,6 +161,7 @@ Form
 					name: "centrality"
 					label: qsTr("Centrality statistics")
 					checked: false
+					info: qsTr("Displays a table with in-degree and out-degree centrality for each problem at this time point.")
 				}
 			}
 		}
@@ -163,6 +173,7 @@ Form
 		label:	qsTr("Save problems")
 		filter:	"*.csv"
 		save:	true
+		info:	qsTr("Saves the problem names and severity values to a .csv file.")
 	}
 
 	FileSelector
@@ -171,11 +182,13 @@ Form
 		label:	qsTr("Save connections")
 		filter:	"*.csv"
 		save:	true
+		info:	qsTr("Saves the connection definitions and strengths to a .csv file.")
 	}
 
 	Section
 	{
 		title: qsTr("Plots")
+		info: qsTr("Options for customizing the appearance of network plots.")
 
 		columns: 1
 
@@ -188,6 +201,7 @@ Form
 				id: layout
 				name: "plotLayout"
 				label: qsTr("Layout")
+				info: qsTr("The layout algorithm used to arrange the nodes in the network plot.")
 				values: [
 					
 					{ label: qsTr("Circular"), value: "linear" },
@@ -199,6 +213,7 @@ Form
 			{
 				name: "colorPalette"
 				label: qsTr("Color palette")
+				info: qsTr("The color palette used for the severity fill in the network plot.")
 				values: [
 					{ label: qsTr("Viridis"),	value: "viridis" },
 					{ label: qsTr("Gray"),		value: "gray"	 },
@@ -213,11 +228,13 @@ Form
 
 			Group {
 				title: qsTr("Problem Severity")
+				info: qsTr("Control how problem severity is visually represented on the nodes.")
 
 				CheckBox
 				{
 					name: "plotSeverityFill"
 					label: qsTr("Color")
+					info: qsTr("Map problem severity to the fill color of the node labels.")
 				}
 
 				CheckBox
@@ -225,23 +242,27 @@ Form
 					name: "plotSeveritySize"
 					label: qsTr("Size")
 					checked: true
+					info: qsTr("Map problem severity to the size of the nodes.")
 				}
 
 				CheckBox
 				{
 					name: "plotSeverityAlpha"
 					label: qsTr("Opacity")
+					info: qsTr("Map problem severity to the opacity of the nodes.")
 				}
 			}
 
 			Group {
 				title: qsTr("Connection Strength")
+				info: qsTr("Control how connection strength is visually represented on the edges.")
 
 				CheckBox
 				{
 					name: "plotStrengthColor"
 					label: qsTr("Color")
 					checked: true
+					info: qsTr("Map connection strength to the color of the edges.")
 				}
 
 				CheckBox
@@ -249,12 +270,14 @@ Form
 					name: "plotStrengthWidth"
 					label: qsTr("Width")
 					checked: true
+					info: qsTr("Map connection strength to the width of the edges.")
 				}
 
 				CheckBox
 				{
 					name: "plotStrengthAlpha"
 					label: qsTr("Opacity")
+					info: qsTr("Map connection strength to the opacity of the edges.")
 				}
 			}
 		}

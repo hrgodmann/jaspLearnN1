@@ -20,15 +20,15 @@ Forecasting <- function(jaspResults, dataset = NULL, options) {
 
   .ln1Intro(jaspResults, options, .ln1ForeIntroText)
 
-  if (options$inputType == "loadData") {
-    ready <- options$dependent != ""
+  if (options[["inputType"]] == "loadData") {
+    ready <- options[["dependent"]] != ""
   } else {
     ready <- TRUE
   }
 
   dataset <- .ln1ForeData(jaspResults, dataset, options, ready)
 
-  .ln1NetCreateDataPlot(jaspResults, dataset, options, .ln1ForeGetDataDependencies, ready)
+  .ln1ForeCreateDataPlot(jaspResults, dataset, options, .ln1ForeGetDataDependencies, ready)
 
   .ln1ForeEstimateModel(jaspResults, dataset, options, ready)
 
@@ -141,10 +141,10 @@ Forecasting is an umbrella term that captures many different analysis techniques
     model = list(
       "ar" = arEffects,
       "ma" = maEffects,
-      "order" = c(length(arEffects), options$simIEffect, length(maEffects))
+      "order" = c(length(arEffects), options[["simIEffect"]], length(maEffects))
     ),
-    n = options$numSamples,
-    sd = options$noiseSd
+    n = options[["numSamples"]],
+    sd = options[["noiseSd"]]
   )
 
   y <- y[-1]
@@ -168,7 +168,7 @@ Forecasting is an umbrella term that captures many different analysis techniques
 }
 
 .ln1ForeEstimateModelHelper <- function(dataset, options) {
-  mod <-try(forecast::auto.arima(
+  mod <- try(forecast::auto.arima(
     dataset[["y"]],
     allowdrift = TRUE,
     allowmean = TRUE
@@ -178,14 +178,14 @@ Forecasting is an umbrella term that captures many different analysis techniques
     .quitAnalysis(jaspBase::.extractErrorMessage(mod))
   }
 
-  if (length(mod$coef) == 0) {
+  if (length(mod[["coef"]]) == 0) {
     .quitAnalysis(gettext("No parameters are estimated."))
   }
 
   return(mod)
 }
 
-.ln1NetCreateDataPlot <- function(jaspResults, dataset, options, dependencyFun, ready) {
+.ln1ForeCreateDataPlot <- function(jaspResults, dataset, options, dependencyFun, ready) {
   if (options[["plotData"]] && is.null(jaspResults[["dataPlot"]])) {
     dataPlot <- createJaspPlot(
       title = gettext("Data plot"),
@@ -197,15 +197,15 @@ Forecasting is an umbrella term that captures many different analysis techniques
     dataPlot$dependOn(c("plotData", "plotPoints", "plotLine", dependencyFun()))
 
     if (ready) {
-      dataPlot$plotObject <- .ln1NetCreateDataPlotFill(dataset, options)
+      dataPlot$plotObject <- .ln1ForeCreateDataPlotFill(dataset, options)
     }
 
     jaspResults[["dataPlot"]] <- dataPlot
   }
 }
 
-.ln1NetCreateDataPlotFill <- function(dataset, options) {
-  yName <- options$dependent
+.ln1ForeCreateDataPlotFill <- function(dataset, options) {
+  yName <- options[["dependent"]]
 
   xBreaks <- jaspGraphs::getPrettyAxisBreaks(dataset[["t"]])
   yBreaks <- jaspGraphs::getPrettyAxisBreaks(dataset[["y"]])

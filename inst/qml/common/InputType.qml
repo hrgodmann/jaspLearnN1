@@ -26,7 +26,8 @@ RadioButtonGroup
 	name: "inputType"
 	title: qsTr("Input Type")
 	columns: 3
-	
-	RadioButton { value: "simulateData"; id: simulateData; label: qsTr("Simulate data"); checked: true }
-	RadioButton { value: "loadData"; id: loadData; label: qsTr("Load data") }
+	info: qsTr("Specifies whether to use simulated data or load data from the dataset.")
+
+	RadioButton { value: "simulateData"; id: simulateData; label: qsTr("Simulate data"); checked: true; info: qsTr("Generate data from a simulation model with configurable parameters.") }
+	RadioButton { value: "loadData"; id: loadData; label: qsTr("Load data"); info: qsTr("Use variables from the loaded dataset.") }
 }

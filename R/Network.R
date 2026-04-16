@@ -43,7 +43,7 @@ Network <- function(jaspResults, dataset = NULL, options) {
     return(c(problem[["problem"]], problem[["problemSeverity"]]))
   })))
   names(nodeAttributes) <- c("name", "strength")
-  nodeAttributes$strength <- as.numeric(nodeAttributes$strength)
+  nodeAttributes[["strength"]] <- as.numeric(nodeAttributes[["strength"]])
 
   jaspResults[["nodeAttributesState"]] <- createJaspState(nodeAttributes)
 
@@ -57,7 +57,7 @@ Network <- function(jaspResults, dataset = NULL, options) {
     jaspResults[["edgelistContainer"]] <- edgelistContainer
   }
 
-  for (i in 1:length(options[["connectionList"]])) {
+  for (i in seq_along(options[["connectionList"]])) {
     edgelistOptions <- options[["connectionList"]][[i]]
     if (.ln1NetCheckEdgelist(edgelistOptions)) {
       edgelistName <- edgelistOptions[["name"]]
@@ -79,8 +79,8 @@ Network <- function(jaspResults, dataset = NULL, options) {
     return(c(path[["connectionFrom"]], path[["connectionTo"]], path[["connectionStrength"]]))
   })))
   names(edgelist) <- c("from", "to", "weight")
-  edgelist$weight <- as.numeric(edgelist$weight)
-  edgelist$absWeight <- abs(edgelist$weight)
+  edgelist[["weight"]] <- as.numeric(edgelist[["weight"]])
+  edgelist[["absWeight"]] <- abs(edgelist[["weight"]])
   return(createJaspState(edgelist))
 }
 
@@ -94,7 +94,7 @@ Network <- function(jaspResults, dataset = NULL, options) {
   }
 
   if (!is.null(jaspResults[["edgelistContainer"]]) && length(jaspResults[["edgelistContainer"]]) > 0) {
-    for (i in 1:length(options[["connectionList"]])) {
+    for (i in seq_along(options[["connectionList"]])) {
       edgelistOptions <- options[["connectionList"]][[i]]
       edgelistName <- edgelistOptions[["name"]]
       if (is.null(jaspResults[["centralityContainer"]][[edgelistName]])) {
@@ -118,7 +118,7 @@ Network <- function(jaspResults, dataset = NULL, options) {
 
       if (edgelistOptions[["centrality"]] && is.null(jaspResults[["centralityTableContainer"]][[edgelistName]]) && 
         !is.null(jaspResults[["centralityContainer"]][[edgelistName]])) {
-        centralityTable <- createJaspTable(gettext(edgelistName))
+        centralityTable <- createJaspTable(edgelistName)
         centralityTable$dependOn(
           nestedOptions = list(
             c("connectionList", i, "connections"),
@@ -167,7 +167,7 @@ Network <- function(jaspResults, dataset = NULL, options) {
   }
 
   if (!is.null(jaspResults[["edgelistContainer"]]) && length(jaspResults[["edgelistContainer"]]) > 0) {
-    for (i in 1:length(options[["connectionList"]])) {
+    for (i in seq_along(options[["connectionList"]])) {
       edgelistOptions <- options[["connectionList"]][[i]]
       if (edgelistOptions[["plotNetwork"]] && .ln1NetCheckEdgelist(edgelistOptions)) {
         edgelistName <- edgelistOptions[["name"]]
@@ -180,7 +180,7 @@ Network <- function(jaspResults, dataset = NULL, options) {
         dataPlot$dependOn(
           options = c(
             "plotLayout", "colorPalette", "plotSeverityFill", "plotSeveritySize", "plotSeverityAlpha", 
-            "plotStrengthColor", "plotStrengthWidt", "plotStrengthAlpha"
+            "plotStrengthColor", "plotStrengthWidth", "plotStrengthAlpha"
           ),
           nestedOptions = list(
             c("connectionList", i, "connections"),
@@ -263,11 +263,11 @@ Network <- function(jaspResults, dataset = NULL, options) {
       limits = c(0, 1),
       breaks = seq(0, 1, 0.5)
     ) +
-    ggraph::scale_edge_width_continuous(limits = c(0, 1), range = c(0.5, 4), guide = FALSE) +
-    ggraph::scale_edge_alpha_continuous(limits = c(0, 1), range = c(0, 1), guide = FALSE) +
-    ggraph::scale_edge_color_gradient2(limits = c(-1, 1), guide = FALSE) +
-    ggplot2::scale_size_continuous(limits = c(0, 1), range = c(3, 8), guide = FALSE) +
-    ggplot2::scale_alpha_continuous(limits = c(0, 1), range = c(0, 1), guide = FALSE) +
+    ggraph::scale_edge_width_continuous(limits = c(0, 1), range = c(0.5, 4), guide = "none") +
+    ggraph::scale_edge_alpha_continuous(limits = c(0, 1), range = c(0, 1), guide = "none") +
+    ggraph::scale_edge_color_gradient2(limits = c(-1, 1), guide = "none") +
+    ggplot2::scale_size_continuous(limits = c(0, 1), range = c(3, 8), guide = "none") +
+    ggplot2::scale_alpha_continuous(limits = c(0, 1), range = c(0, 1), guide = "none") +
     ggraph::theme_graph() +
     ggplot2::theme(
       legend.title = ggplot2::element_text(size = 14),
@@ -280,7 +280,7 @@ Network <- function(jaspResults, dataset = NULL, options) {
 .ln1NetConcatenateEdgelists <- function(edgelistContainer, options) {
   edgelistList <- list()
 
-  for (i in 1:length(options[["connectionList"]])) {
+  for (i in seq_along(options[["connectionList"]])) {
     edgelistOptions <- options[["connectionList"]][[i]]
     if (.ln1NetCheckEdgelist(edgelistOptions)) {
       edgelistName <- edgelistOptions[["name"]]
@@ -300,7 +300,7 @@ Network <- function(jaspResults, dataset = NULL, options) {
 
     if (options[["problemSavePath"]] != "") {
       nodeAttributes <- jaspResults[["nodeAttributesState"]]$object
-      write.csv(nodeAttributes, file = options[["problemSavePath"]], row.names = FALSE)
+      utils::write.csv(nodeAttributes, file = options[["problemSavePath"]], row.names = FALSE)
     }
   }
 }
@@ -313,7 +313,7 @@ Network <- function(jaspResults, dataset = NULL, options) {
 
     if (options[["connectionSavePath"]] != "") {
       edgelistDf <- .ln1NetConcatenateEdgelists(jaspResults[["edgelistContainer"]], options)
-      write.csv(edgelistDf[,c("name", "from", "to", "weight")], file = options[["connectionSavePath"]], row.names = FALSE)
+      utils::write.csv(edgelistDf[, c("name", "from", "to", "weight")], file = options[["connectionSavePath"]], row.names = FALSE)
     }
   }
 }

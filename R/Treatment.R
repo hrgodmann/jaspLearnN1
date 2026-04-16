@@ -20,13 +20,13 @@ Treatment <- function(jaspResults, dataset = NULL, options) {
 
   .ln1Intro(jaspResults, options, .ln1TreatIntroText)
 
-  dataset <- .ln1TreatData(jaspResults, dataset, options)
-
-  if (options$inputType == "loadData") {
-    ready <- options$dependent != "" && options$time != "" && options$phase != ""
+  if (options[["inputType"]] == "loadData") {
+    ready <- options[["dependent"]] != "" && options[["time"]] != "" && options[["phase"]] != ""
   } else {
     ready <- TRUE
   }
+
+  dataset <- .ln1TreatData(jaspResults, dataset, options, ready)
 
   .ln1TreatCreateDataPlot(jaspResults, dataset, options, .ln1TreatGetDataDependencies, ready)
   .ln1TreatEstimateModel(jaspResults, dataset, options, ready)
@@ -40,7 +40,10 @@ Treatment <- function(jaspResults, dataset = NULL, options) {
   return(gettext("This model helps answer questions about how a patient's symptoms fluctuate over time and what factors predict changes in their mental health on an individual level. It requires repeated measures of symptom severity, behaviors, or other psychological variables over time, along with potential predictors like therapy interventions or daily stressors. A key feature is its ability to account for within-person variability while distinguishing stable patterns from momentary fluctuations. This is particularly useful for therapists aiming to tailor interventions based on a patient's unique response dynamics. Unlike group-level analyses, this approach provides individualized insights rather than assuming uniform effects across patients."))
 }
 
-.ln1TreatData <- function(jaspResults, dataset, options) {
+.ln1TreatData <- function(jaspResults, dataset, options, ready) {
+  if (!ready)
+    return(NULL)
+
   if (options[["inputType"]] == "simulateData") {
     if (is.null(jaspResults[["simulatedDataState"]])) {
       dataset <- .ln1TreatSimulateData(options)
@@ -68,9 +71,7 @@ Treatment <- function(jaspResults, dataset = NULL, options) {
 
   totalN <- sum(phaseN)
 
-  set.seed(options[["seed"]])
-
-  yNoise <- arima.sim(
+  yNoise <- stats::arima.sim(
     model = list(ar = options[["simTimeEffectAutocorrelation"]]),
     n = totalN,
     sd = options[["simDependentSd"]]
@@ -88,7 +89,7 @@ Treatment <- function(jaspResults, dataset = NULL, options) {
   simData <- data.frame(
     y = y,
     time = time,
-    t = 1:length(time),
+    t = seq_along(time),
     phase = phaseName
   )
 
@@ -170,10 +171,12 @@ Treatment <- function(jaspResults, dataset = NULL, options) {
     table$addColumnInfo(name = "t",            title = gettext("t"),              type = "number")
     table$addColumnInfo(name = "p",            title = gettext("p"),              type = "pvalue")
 
-    overtitle <- gettextf("%.0f%% CI", 100 * options$coefficientCiLevel)
+    overtitle <- gettextf("%.0f%% CI", 100 * options[["coefficientCiLevel"]])
 
     table$addColumnInfo(name = "lower", title = gettext("Lower"), type = "number", overtitle = overtitle)
     table$addColumnInfo(name = "upper", title = gettext("Upper"), type = "number", overtitle = overtitle)
+
+    table$addFootnote(gettext("Results are based on a linear mixed-effects model with an AR(1) correlation structure. The model tests whether the level and trend of the dependent variable changed across treatment phases."))
 
     if (!is.null(jaspResults[["modelState"]]) && ready) {
       .ln1TreatFillCoefficientsTable(table, jaspResults[["modelState"]]$object, options)
@@ -193,7 +196,7 @@ Treatment <- function(jaspResults, dataset = NULL, options) {
   table[["t"]] <- modelCoefficients[["t.value"]]
   table[["p"]] <- modelCoefficients[["p.value"]]
 
-  ci <- nlme::intervals(modelObject, level = options$coefficientCiLevel, which = "fixed")
+  ci <- nlme::intervals(modelObject, level = options[["coefficientCiLevel"]], which = "fixed")
 
   ciFixed <- data.frame(ci[["fixed"]])
 
@@ -209,10 +212,12 @@ Treatment <- function(jaspResults, dataset = NULL, options) {
     table$addColumnInfo(name = "name",         title = "",                        type = "string")
     table$addColumnInfo(name = "coef",         title = gettext("Estimate"),       type = "number")
 
-    overtitle <- gettextf("%.0f%% CI", 100 * options$coefficientCiLevel)
+    overtitle <- gettextf("%.0f%% CI", 100 * options[["coefficientCiLevel"]])
 
     table$addColumnInfo(name = "lower", title = gettext("Lower"), type = "number", overtitle = overtitle)
     table$addColumnInfo(name = "upper", title = gettext("Upper"), type = "number", overtitle = overtitle)
+
+    table$addFootnote(gettext("The AR(1) coefficient reflects the first-order autocorrelation of the residuals, indicating how strongly each observation depends on the previous one."))
 
     if (!is.null(jaspResults[["modelState"]]) && ready) {
       .ln1TreatFillAutoCorTable(table, jaspResults[["modelState"]]$object, options)
@@ -223,18 +228,22 @@ Treatment <- function(jaspResults, dataset = NULL, options) {
 }
 
 .ln1TreatFillAutoCorTable <- function(table, modelObject, options) {
-  ci <- try(nlme::intervals(modelObject, level = options$coefficientCiLevel, which = "all"))
-
   table[["name"]] <- "AR(1)"
 
-  if (!jaspBase::isTryError(ci)) {
-    ciAutoCor <- data.frame(ci[["corStruct"]])
+  # Point estimate is always available from the model
+  corStruct <- modelObject[["modelStruct"]][["corStruct"]]
+  phi <- as.numeric(coef(corStruct, unconstrained = FALSE))
+  table[["coef"]] <- phi
 
-    table[["coef"]]  <- ciAutoCor[["est."]]
+  # CIs may fail when the estimate is near the boundary
+  ci <- try(nlme::intervals(modelObject, level = options[["coefficientCiLevel"]], which = "all"))
+
+  if (!jaspBase::isTryError(ci) && !is.null(ci[["corStruct"]])) {
+    ciAutoCor <- data.frame(ci[["corStruct"]])
     table[["lower"]] <- ciAutoCor[["lower"]]
     table[["upper"]] <- ciAutoCor[["upper"]]
   } else {
-    table$setError(gettext("Cannot estimate auto-correlation."))
+    table$addFootnote(gettext("Confidence intervals for the auto-correlation could not be computed. The point estimate may be near the boundary of the parameter space."))
   }
 }
 
@@ -274,7 +283,7 @@ Treatment <- function(jaspResults, dataset = NULL, options) {
     jaspGraphs::geom_line() +
     jaspGraphs::geom_point() +
     ggplot2::scale_x_continuous(
-      name = if (options$inputType == "loadData") xName else gettext("Time"),
+      name = if (options[["inputType"]] == "loadData") xName else gettext("Time"),
       breaks = xBreaks,
       limits = range(xBreaks)
     ) +

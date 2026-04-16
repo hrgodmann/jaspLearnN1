@@ -11,13 +11,15 @@ Description
 	maintainer	: "JASP Team <info@jasp-stats.org>"
 	website		: "https://jasp-stats.org"
 	license		: "GPL (>= 2)"
-	preloadData : true
+	icon		: "learnN1.svg"
+	preloadData : false
 
 	Analysis
 	{
 		title	:	qsTr("Does The Treatment Work?")
 		func	:	"Treatment"
 		qml		:	"Treatment.qml"
+		requiresData:	false
 	}
 
 	Analysis
@@ -25,6 +27,7 @@ Description
 		title	:	qsTr("How Do Symptoms Develop?")
 		func	:	"Forecasting"
 		qml		:	"Forecasting.qml"
+		requiresData:	false
 	}
 
 	Analysis
@@ -32,5 +35,6 @@ Description
 		title	:	qsTr("How Are Symptoms Connected?")
 		func	:	"Network"
 		qml		:	"Network.qml"
+		requiresData:	false
 	}
 }

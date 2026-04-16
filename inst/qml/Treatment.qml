@@ -36,6 +36,7 @@ Form
 			name: "plotData"
 			label: qsTr("Plot data")
 			checked: true
+			info: qsTr("Displays a plot of the data with time on the x-axis and the dependent variable on the y-axis, colored by phase.")
 		}
 	}
 
@@ -44,6 +45,7 @@ Form
 		title: qsTr("Data")
 		id: sectionData
 		columns:1
+		info: qsTr("Specify the data source: simulate data with configurable parameters or load variables from a dataset.")
 
 		Common.InputType
 		{
@@ -61,6 +63,7 @@ Form
 				title:				qsTr("Dependent Variable")
 				allowedColumns:		["scale"]
 				singleVariable:		true
+				info:				qsTr("The outcome variable measured over time (e.g., symptom severity).")
 			}
 			AssignedVariablesList
 			{
@@ -68,6 +71,7 @@ Form
 				title:			qsTr("Time")
 				allowedColumns:	["scale"]
 				singleVariable:	true
+				info:			qsTr("The time variable indicating when each observation was recorded.")
 			}
 			AssignedVariablesList
 			{
@@ -75,6 +79,7 @@ Form
 				title:			qsTr("Phase Variable")
 				allowedColumns:	["nominal"]
 				singleVariable:	true
+				info:			qsTr("A categorical variable indicating the treatment phase (e.g., pre-treatment, treatment, post-treatment).")
 			}
 		}
 
@@ -82,20 +87,23 @@ Form
 		{
 			title: qsTr("Simulation Options")
 			visible: inputType.value == "simulateData"
+			info: qsTr("Configure the parameters for generating simulated treatment data.")
 
 			Group
 			{
-				columns: 3
+				columns: 2
 
 				Group
 				{
 					title: qsTr("Dependent Variable")
+					info: qsTr("Parameters for the simulated dependent variable.")
 
 					DoubleField
 					{
 						name: "simDependentMean"
 						label: "Mean"
 						defaultValue: 0.0
+						info: qsTr("The mean of the dependent variable before adding phase and time effects.")
 					}
 
 					DoubleField
@@ -103,12 +111,14 @@ Form
 						name: "simDependentSd"
 						label: "Standard deviation"
 						defaultValue: 1.0
+						info: qsTr("The standard deviation of the noise added to the simulated data.")
 					}
 				}
 
 				Group
 				{
 					title: qsTr("Time")
+					info: qsTr("Parameters for the simulated time effects.")
 
 					DoubleField
 					{
@@ -116,6 +126,7 @@ Form
 						label: qsTr("Effect")
 						defaultValue: 0.0
 						negativeValues: true
+						info: qsTr("The linear effect of time on the dependent variable.")
 					}
 
 					DoubleField
@@ -126,20 +137,23 @@ Form
 						min: -1
 						max: 1
 						negativeValues: true
+						info: qsTr("The first-order auto-correlation of the noise process. Values range from -1 to 1.")
 					}
 				}
+			}
 
-				IntegerField
-				{
-					name: "seed"
-					label: qsTr("Seed")
-					defaultValue: 1
-				}
+			IntegerField
+			{
+				name: "seed"
+				label: qsTr("Seed")
+				defaultValue: 1
+				info: qsTr("Sets the random number generator seed for reproducible simulations.")
 			}
 
 			Group
 			{
 				title: qsTr("Phase Effect")
+				info: qsTr("Define the treatment phases and their effects on the dependent variable.")
 
 				ComponentsList
 				{
@@ -148,6 +162,7 @@ Form
 					preferredWidth: sectionData.width - 8 * jaspTheme.contentMargin
 					minimumItems: 1
 					headerLabels: [qsTr("Name"), qsTr("Phase"), qsTr("Phase × Time"), qsTr("Time points")]
+					info: qsTr("Each row defines a treatment phase with its name, effect on the dependent variable, interaction with time, and number of time points.")
 					defaultValues: [
 						{"simPhaseName": "Pre-treament", "simPhaseEffectSimple": 0.0, "simPhaseEffectInteraction": 0.0, "simPhaseEffectN": 20},
 						{"simPhaseName": "Treatment", "simPhaseEffectSimple": 5.0, "simPhaseEffectInteraction": 0.0, "simPhaseEffectN": 20},
@@ -163,6 +178,7 @@ Form
 						{
 							name: "simPhaseName"
 							defaultValue: qsTr("Phase ") + (rowIndex + 1)
+							info: qsTr("The name of this treatment phase.")
 						}
 
 						DoubleField
@@ -170,6 +186,7 @@ Form
 							name: "simPhaseEffectSimple"
 							defaultValue: 0.0
 							negativeValues: true
+							info: qsTr("The constant effect of this phase on the dependent variable.")
 						}
 
 						DoubleField
@@ -177,12 +194,14 @@ Form
 							name: "simPhaseEffectInteraction"
 							defaultValue: 0.0
 							negativeValues: true
+							info: qsTr("The interaction effect between this phase and time.")
 						}
 
 						IntegerField
 						{
 							name: "simPhaseEffectN"
 							defaultValue: 20
+							info: qsTr("The number of time points in this phase.")
 						}
 					}
 				}
@@ -192,8 +211,9 @@ Form
 
 	Section
 	{
-		title: qsTr("Options")
+		title: qsTr("Estimation Options")
+		info: qsTr("Additional analysis options.")
 
-		CIField { name: "coefficientCiLevel"; label: qsTr("Confidence interval")}
+		CIField { name: "coefficientCiLevel"; label: qsTr("Confidence interval"); info: qsTr("The confidence level for the coefficient confidence intervals.") }
 	}
 }
