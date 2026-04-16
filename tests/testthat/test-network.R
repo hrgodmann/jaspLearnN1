@@ -5,8 +5,8 @@ test_that("Network specification works", {
   options$enableIntroText <- FALSE
   options$problemSavePath <- ""
   options$connectionSavePath <- ""
-  options$problems <- list(list(problem = "A", problemSeverity = 0.8), list(problem = "B",
-      problemSeverity = 0.2), list(problem = "C", problemSeverity = 0.5))
+  options$problems <- list(list(problemName = "A", problemSeverity = 0.8), list(problemName = "B",
+      problemSeverity = 0.2), list(problemName = "C", problemSeverity = 0.5))
   options$connectionList <- list(list(connections = list(list(connectionFrom = "A", connectionTo = "B",
       connectionStrength = 0.5), list(connectionFrom = "A", connectionTo = "C",
       connectionStrength = -0.5), list(connectionFrom = "C", connectionTo = "B",

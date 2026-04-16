@@ -40,7 +40,7 @@ Network <- function(jaspResults, dataset = NULL, options) {
 
 .ln1NetData <- function(jaspResults, dataset, options) {
   nodeAttributes <- data.frame(t(sapply(options[["problems"]], function(problem) {
-    return(c(problem[["problem"]], problem[["problemSeverity"]]))
+    return(c(problem[["problemName"]], problem[["problemSeverity"]]))
   })))
   names(nodeAttributes) <- c("name", "strength")
   nodeAttributes[["strength"]] <- as.numeric(nodeAttributes[["strength"]])
@@ -57,9 +57,10 @@ Network <- function(jaspResults, dataset = NULL, options) {
     jaspResults[["edgelistContainer"]] <- edgelistContainer
   }
 
+  nodeNames <- .ln1NetNodeNames(options)
   for (i in seq_along(options[["connectionList"]])) {
     edgelistOptions <- options[["connectionList"]][[i]]
-    if (.ln1NetCheckEdgelist(edgelistOptions)) {
+    if (.ln1NetCheckEdgelist(edgelistOptions, nodeNames)) {
       edgelistName <- edgelistOptions[["name"]]
       edgelistState <- .ln1NetSingleEdgelist(edgelistOptions)
       edgelistState$dependOn(nestedOptions = list(c("connectionList", i, "connections")))
@@ -68,9 +69,18 @@ Network <- function(jaspResults, dataset = NULL, options) {
   }
 }
 
-.ln1NetCheckEdgelist <- function(edgelistOptions) {
+.ln1NetNodeNames <- function(options) {
+  sapply(options[["problems"]], function(p) p[["problemName"]])
+}
+
+.ln1NetCheckEdgelist <- function(edgelistOptions, nodeNames = NULL) {
   return(all(sapply(edgelistOptions[["connections"]], function(path) {
-    return(path[["connectionFrom"]] != "" && path[["connectionTo"]] != "")
+    from <- path[["connectionFrom"]]
+    to   <- path[["connectionTo"]]
+    valid <- from != "" && to != "" && from != to
+    if (valid && !is.null(nodeNames))
+      valid <- from %in% nodeNames && to %in% nodeNames
+    return(valid)
   })))
 }
 
@@ -98,7 +108,7 @@ Network <- function(jaspResults, dataset = NULL, options) {
       edgelistOptions <- options[["connectionList"]][[i]]
       edgelistName <- edgelistOptions[["name"]]
       if (is.null(jaspResults[["centralityContainer"]][[edgelistName]])) {
-        if (.ln1NetCheckEdgelist(edgelistOptions)) {
+        if (.ln1NetCheckEdgelist(edgelistOptions, .ln1NetNodeNames(options))) {
           centralityState <- createJaspState(
             .ln1NetCentralitySingle(
               jaspResults[["edgelistContainer"]][[edgelistName]]$object,
@@ -169,7 +179,7 @@ Network <- function(jaspResults, dataset = NULL, options) {
   if (!is.null(jaspResults[["edgelistContainer"]]) && length(jaspResults[["edgelistContainer"]]) > 0) {
     for (i in seq_along(options[["connectionList"]])) {
       edgelistOptions <- options[["connectionList"]][[i]]
-      if (edgelistOptions[["plotNetwork"]] && .ln1NetCheckEdgelist(edgelistOptions)) {
+      if (edgelistOptions[["plotNetwork"]] && .ln1NetCheckEdgelist(edgelistOptions, .ln1NetNodeNames(options))) {
         edgelistName <- edgelistOptions[["name"]]
         dataPlot <- createJaspPlot(
           title = edgelistName,
@@ -212,21 +222,19 @@ Network <- function(jaspResults, dataset = NULL, options) {
   absWeightQuosure <- "absWeight"
 
   nodeArgs <- list()
-  labelArgs <- list(label = "name")
+  textArgs <- list(label = "name")
   edgeArgs <- list()
 
   if (options[["plotSeverityFill"]]) {
-    labelArgs[["fill"]] <- strengthQuosure
+    nodeArgs[["fill"]] <- strengthQuosure
   }
 
   if (options[["plotSeveritySize"]]) {
     nodeArgs[["size"]] <- strengthQuosure
-    labelArgs[["size"]] <- strengthQuosure
   }
 
   if (options[["plotSeverityAlpha"]]) {
     nodeArgs[["alpha"]] <- strengthQuosure
-    labelArgs[["alpha"]] <- strengthQuosure
   }
 
   if (options[["plotStrengthColor"]]) {
@@ -247,27 +255,65 @@ Network <- function(jaspResults, dataset = NULL, options) {
     return(ggplot2::aes(!!!args))
   }
 
+  # Edges: curved fan with filled arrowheads
   p <- p +
     ggraph::geom_edge_fan(
       mapping = do.call(getAes, args = edgeArgs),
-      arrow = grid::arrow(),
+      arrow = grid::arrow(type = "closed", angle = 25, length = grid::unit(3, "mm")),
+      end_cap = ggraph::circle(14, "mm"),
+      start_cap = ggraph::circle(14, "mm"),
+      strength = 0.3,
       show.legend = FALSE
-    ) +
-    ggraph::geom_node_point(mapping = do.call(getAes, args = nodeArgs), show.legend = FALSE) +
-    ggraph::geom_node_label(mapping = do.call(getAes, args = labelArgs), show.legend = !is.null(labelArgs[["fill"]]), repel = TRUE) +
-    ggplot2::scale_x_continuous(expand = ggplot2::expansion(add = 0.1)) +
-    ggplot2::scale_y_continuous(expand = ggplot2::expansion(add = 0.1)) +
+    )
+
+  # Nodes: filled colored circles
+  nodeStaticArgs <- list(
+    mapping   = do.call(getAes, args = nodeArgs),
+    shape     = 21,
+    color     = "grey30",
+    stroke    = 0.8,
+    show.legend = !is.null(nodeArgs[["fill"]])
+  )
+  if (is.null(nodeArgs[["fill"]])) {
+    nodeStaticArgs[["fill"]] <- "#B3BAC5"
+  }
+  if (is.null(nodeArgs[["size"]])) {
+    nodeStaticArgs[["size"]] <- 12
+  }
+  p <- p + do.call(ggraph::geom_node_point, nodeStaticArgs)
+
+  # Labels: repelled away from nodes and edges
+  p <- p +
+    ggraph::geom_node_text(
+      mapping = do.call(getAes, args = textArgs),
+      repel = TRUE,
+      size = 5.5,
+      fontface = "bold",
+      bg.color = "white",
+      bg.r = 0.15,
+      point.padding = grid::unit(15, "mm"),
+      box.padding = grid::unit(5, "mm"),
+      min.segment.length = grid::unit(0, "mm"),
+      force = 2,
+      force_pull = 0.5,
+      max.overlaps = Inf,
+      show.legend = FALSE
+    )
+
+  p <- p +
+    ggplot2::scale_x_continuous(expand = ggplot2::expansion(add = 0.4)) +
+    ggplot2::scale_y_continuous(expand = ggplot2::expansion(add = 0.4)) +
     jaspGraphs::scale_JASPfill_continuous(
       name = gettext("Severity"),
       palette = options[["colorPalette"]],
       limits = c(0, 1),
       breaks = seq(0, 1, 0.5)
     ) +
-    ggraph::scale_edge_width_continuous(limits = c(0, 1), range = c(0.5, 4), guide = "none") +
+    ggraph::scale_edge_width_continuous(limits = c(0, 1), range = c(0.3, 1.5), guide = "none") +
     ggraph::scale_edge_alpha_continuous(limits = c(0, 1), range = c(0, 1), guide = "none") +
-    ggraph::scale_edge_color_gradient2(limits = c(-1, 1), guide = "none") +
-    ggplot2::scale_size_continuous(limits = c(0, 1), range = c(3, 8), guide = "none") +
-    ggplot2::scale_alpha_continuous(limits = c(0, 1), range = c(0, 1), guide = "none") +
+    ggraph::scale_edge_color_gradient2(limits = c(-1, 1), low = "#D55E00", mid = "grey80", high = "#0072B2", guide = "none") +
+    ggplot2::scale_size_continuous(limits = c(0, 1), range = c(10, 20), guide = "none") +
+    ggplot2::scale_alpha_continuous(limits = c(0, 1), range = c(0.3, 1), guide = "none") +
     ggraph::theme_graph() +
     ggplot2::theme(
       legend.title = ggplot2::element_text(size = 14),
@@ -282,7 +328,7 @@ Network <- function(jaspResults, dataset = NULL, options) {
 
   for (i in seq_along(options[["connectionList"]])) {
     edgelistOptions <- options[["connectionList"]][[i]]
-    if (.ln1NetCheckEdgelist(edgelistOptions)) {
+    if (.ln1NetCheckEdgelist(edgelistOptions, .ln1NetNodeNames(options))) {
       edgelistName <- edgelistOptions[["name"]]
       edgelistList[[edgelistName]] <- edgelistContainer[[edgelistName]]$object
       edgelistList[[edgelistName]][["name"]] <- edgelistName

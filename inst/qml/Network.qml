@@ -32,28 +32,40 @@ Form
 		Common.IntroText{}
 	}
 
-	InputListView
+	ComponentsList
 	{
 		id: problems
 		name: "problems"
 		title: qsTr("Problems")
-		preferredHeight: jaspTheme.smallDefaultVariablesFormHeight
-		optionKey: "problem"
-		defaultValues: ["Problem 1", "Problem 2", "Problem 3"]
-		placeHolder: qsTr("New Problem")
-		minRows: 2
-		maxRows: 10
-		rowComponentTitle: "Severity"
+		minimumItems: 2
+		maximumItems: 10
+		headerLabels: [qsTr("Name"), qsTr("Severity")]
+		defaultValues: [
+			{"problemName": qsTr("Problem 1"), "problemSeverity": 0.5},
+			{"problemName": qsTr("Problem 2"), "problemSeverity": 0.5},
+			{"problemName": qsTr("Problem 3"), "problemSeverity": 0.5}
+		]
 		info: qsTr("Define the problems (symptoms) and their severity. Use the slider to set the severity of each problem between 0 and 1.")
 
-		rowComponent: Slider
+		rowComponent: RowLayout
 		{
-			name: "problemSeverity"
-			value: 0.5
-			min: 0
-			max: 1
-			vertical: false
-			info: qsTr("The severity of this problem, ranging from 0 (none) to 1 (maximum).")
+			TextField
+			{
+				name: "problemName"
+				value: qsTr("New Problem")
+				fieldWidth: 150 * preferencesModel.uiScale
+				info: qsTr("The name of this problem.")
+			}
+
+			Slider
+			{
+				name: "problemSeverity"
+				value: 0.5
+				min: 0
+				max: 1
+				vertical: false
+				info: qsTr("The severity of this problem, ranging from 0 (none) to 1 (maximum).")
+			}
 		}
 	}
 
@@ -95,38 +107,18 @@ Form
 					{
 						id: from
 						name: "connectionFrom"
-						source: problems
+						source: "problems.problemName"
 						addEmptyValue: true
 						info: qsTr("The source problem of this connection.")
-						onCurrentValueChanged:
-						{
-							if (to.currentValue == currentValue)
-								addControlError("Same value!")
-							else
-							{
-								clearControlError()
-								to.clearControlError()
-							}
-						}
 					}
 
 					DropDown
 					{
 						id: to
 						name: "connectionTo"
-						source: problems
+						source: "problems.problemName"
 						addEmptyValue: true
 						info: qsTr("The target problem of this connection.")
-						onCurrentValueChanged:
-						{
-							if (from.currentValue == currentValue)
-								addControlError("Same value!")
-							else
-							{
-								clearControlError()
-								from.clearControlError()
-							}
-						}
 					}
 
 					Slider

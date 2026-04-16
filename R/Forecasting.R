@@ -98,6 +98,9 @@ Forecasting is an umbrella term that captures many different analysis techniques
 } 
 
 .ln1ForeData <- function(jaspResults, dataset, options, ready) {
+  if (!ready)
+    return(NULL)
+
   if (options[["inputType"]] == "simulateData") {
     if (is.null(jaspResults[["dataState"]])) {
       dataset <- .ln1ForeSimulateData(options)
@@ -108,9 +111,18 @@ Forecasting is an umbrella term that captures many different analysis techniques
       dataset <- jaspResults[["dataState"]]$object
     }
   } else {
-    datasetRaw <- jaspDescriptives::.tsReadData(jaspResults, dataset, options, ready, covariates = TRUE)
-    dataset <- jaspDescriptives::.tsDataWithMissingRowsHandler(datasetRaw, options, ready)
-    jaspDescriptives::.tsErrorHandler(dataset, ready)
+    columnsNumeric <- options[["dependent"]]
+    if (options[["time"]] != "")
+      columnsNumeric <- c(columnsNumeric, options[["time"]])
+    dataset <- .readDataSetToEnd(
+      columns.as.numeric = columnsNumeric
+    )
+    dataset[["y"]] <- dataset[[options[["dependent"]]]]
+    if (options[["time"]] != "") {
+      dataset[["t"]] <- dataset[[options[["time"]]]]
+    } else {
+      dataset[["t"]] <- seq_len(nrow(dataset))
+    }
   }
 
   return(dataset)

@@ -53,6 +53,11 @@ Treatment <- function(jaspResults, dataset = NULL, options) {
     } else {
       dataset <- jaspResults[["simulatedDataState"]]$object
     }
+  } else {
+    dataset <- .readDataSetToEnd(
+      columns.as.numeric = c(options[["dependent"]], options[["time"]]),
+      columns.as.factor  = options[["phase"]]
+    )
   }
 
   # Add dummy grouping variable for mixed model
