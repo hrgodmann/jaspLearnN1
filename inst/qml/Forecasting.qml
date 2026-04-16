@@ -30,20 +30,13 @@ Form
 		columns: 2
 
 		Common.IntroText{}
-
-		CheckBox
-		{
-			name: "plotData"
-			label: qsTr("Plot data")
-			checked: true
-			info: qsTr("Displays a plot of the observed time series data.")
-		}
 	}
 
 	Section
 	{
 		title: qsTr("Data")
 		id: sectionData
+		expanded: true
 		columns:1
 		info: qsTr("Specify the data source: simulate data with configurable ARIMA parameters or load variables from a dataset.")
 
@@ -202,25 +195,21 @@ Form
 				info: qsTr("Sets the random number generator seed for reproducible simulations.")
 			}
 		}
-	}
-
-	Section
-	{
-		title: qsTr("Estimation Options")
-		info: qsTr("Additional analysis options.")
 
 		CIField { name: "coefficientCiLevel"; label: qsTr("Confidence interval"); info: qsTr("The confidence level for the coefficient confidence intervals.") }
 	}
 
 	Section
 	{
-		title: qsTr("Plots")
-		info: qsTr("Options for customizing data plots.")
+		title: qsTr("Output Options")
+		info: qsTr("Configure which plots and tables are shown in the output.")
 
-		Group
+		CheckBox
 		{
-			title: qsTr("Data plot")
-			info: qsTr("Options for the observed data plot.")
+			name: "plotData"
+			label: qsTr("Plot data")
+			checked: true
+			info: qsTr("Displays a plot of the observed time series data.")
 
 			CheckBox
 			{

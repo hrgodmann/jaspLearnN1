@@ -26,8 +26,9 @@ Network <- function(jaspResults, dataset = NULL, options) {
 
   .ln1NetCentrality(jaspResults, options)
 
-  .ln1NetSaveProblems(jaspResults, options)
-  .ln1NetSaveConnections(jaspResults, options)
+  .ln1NetEdgeWeightTables(jaspResults, options)
+
+  .ln1NetSaveNetwork(jaspResults, options)
 }
 
 .ln1NetIntroText <- function() {
@@ -60,8 +61,15 @@ Network <- function(jaspResults, dataset = NULL, options) {
   nodeNames <- .ln1NetNodeNames(options)
   for (i in seq_along(options[["connectionList"]])) {
     edgelistOptions <- options[["connectionList"]][[i]]
-    if (.ln1NetCheckEdgelist(edgelistOptions, nodeNames)) {
-      edgelistName <- edgelistOptions[["name"]]
+    edgelistName <- edgelistOptions[["name"]]
+    if (isTRUE(edgelistOptions[["allConnections"]])) {
+      edgelistState <- .ln1NetAllEdges(edgelistOptions[["allConnectionStrengths"]], nodeNames)
+      edgelistState$dependOn(nestedOptions = list(
+        c("connectionList", i, "allConnections"),
+        c("connectionList", i, "allConnectionStrengths")
+      ))
+      jaspResults[["edgelistContainer"]][[edgelistName]] <- edgelistState
+    } else if (.ln1NetCheckEdgelist(edgelistOptions, nodeNames)) {
       edgelistState <- .ln1NetSingleEdgelist(edgelistOptions)
       edgelistState$dependOn(nestedOptions = list(c("connectionList", i, "connections")))
       jaspResults[["edgelistContainer"]][[edgelistName]] <- edgelistState
@@ -71,6 +79,30 @@ Network <- function(jaspResults, dataset = NULL, options) {
 
 .ln1NetNodeNames <- function(options) {
   sapply(options[["problems"]], function(p) p[["problemName"]])
+}
+
+.ln1NetAllEdges <- function(allConnStrengths, nodeNames) {
+  edges <- data.frame(from = character(0), to = character(0),
+                      weight = numeric(0), absWeight = numeric(0),
+                      stringsAsFactors = FALSE)
+  for (i in seq_along(allConnStrengths)) {
+    fromName <- nodeNames[i]
+    if (is.na(fromName) || fromName == "") next
+    targets <- allConnStrengths[[i]][["targets"]]
+    for (j in seq_along(targets)) {
+      toName <- nodeNames[j]
+      if (is.na(toName) || toName == "") next
+      if (fromName != toName) {
+        strength <- as.numeric(targets[[j]][["connectionStrength"]])
+        edges <- rbind(edges, data.frame(
+          from = fromName, to = toName,
+          weight = strength, absWeight = abs(strength),
+          stringsAsFactors = FALSE
+        ))
+      }
+    }
+  }
+  return(createJaspState(edges))
 }
 
 .ln1NetFindSelfLoops <- function(edgelistOptions) {
@@ -119,7 +151,8 @@ Network <- function(jaspResults, dataset = NULL, options) {
       edgelistOptions <- options[["connectionList"]][[i]]
       edgelistName <- edgelistOptions[["name"]]
       if (is.null(jaspResults[["centralityContainer"]][[edgelistName]])) {
-        if (.ln1NetCheckEdgelist(edgelistOptions, .ln1NetNodeNames(options))) {
+        useAllConnections <- isTRUE(edgelistOptions[["allConnections"]])
+        if (useAllConnections || .ln1NetCheckEdgelist(edgelistOptions, .ln1NetNodeNames(options))) {
           edgelist <- jaspResults[["edgelistContainer"]][[edgelistName]]$object
           usedNodes <- unique(c(edgelist[["from"]], edgelist[["to"]]))
           nodeAttrs <- jaspResults[["nodeAttributesState"]]$object
@@ -134,6 +167,8 @@ Network <- function(jaspResults, dataset = NULL, options) {
           centralityState$dependOn(
             nestedOptions = list(
               c("connectionList", i, "connections"),
+              c("connectionList", i, "allConnections"),
+              c("connectionList", i, "allConnectionStrengths"),
               c("connectionList", i, "centrality")
             )
           )
@@ -146,6 +181,7 @@ Network <- function(jaspResults, dataset = NULL, options) {
         centralityTable <- createJaspTable(edgelistName)
         centralityTable$dependOn(
           nestedOptions = list(
+            c("connectionList", i, "name"),
             c("connectionList", i, "connections"),
             c("connectionList", i, "centrality")
           )
@@ -186,6 +222,45 @@ Network <- function(jaspResults, dataset = NULL, options) {
   return(table)
 }
 
+.ln1NetEdgeWeightTables <- function(jaspResults, options) {
+  if (is.null(jaspResults[["edgeWeightTableContainer"]])) {
+    jaspResults[["edgeWeightTableContainer"]] <- createJaspContainer(title = gettext("Edge Weights"))
+  }
+
+  if (!is.null(jaspResults[["edgelistContainer"]]) && length(jaspResults[["edgelistContainer"]]) > 0) {
+    nodeNames <- .ln1NetNodeNames(options)
+    for (i in seq_along(options[["connectionList"]])) {
+      edgelistOptions <- options[["connectionList"]][[i]]
+      edgelistName <- edgelistOptions[["name"]]
+      if (edgelistOptions[["edgeWeightTable"]] && is.null(jaspResults[["edgeWeightTableContainer"]][[edgelistName]])) {
+        useAllConnections <- isTRUE(edgelistOptions[["allConnections"]])
+        if (useAllConnections || .ln1NetCheckEdgelist(edgelistOptions, nodeNames)) {
+          edgelist <- jaspResults[["edgelistContainer"]][[edgelistName]]$object
+          edgeTable <- createJaspTable(edgelistName)
+          edgeTable$dependOn(
+            nestedOptions = list(
+              c("connectionList", i, "name"),
+              c("connectionList", i, "connections"),
+              c("connectionList", i, "allConnections"),
+              c("connectionList", i, "allConnectionStrengths"),
+              c("connectionList", i, "edgeWeightTable")
+            )
+          )
+          edgeTable$addColumnInfo(name = "from",   title = gettext("From"),   type = "string")
+          edgeTable$addColumnInfo(name = "to",     title = gettext("To"),     type = "string")
+          edgeTable$addColumnInfo(name = "weight", title = gettext("Weight"), type = "number")
+
+          edgeTable[["from"]]   <- edgelist[["from"]]
+          edgeTable[["to"]]     <- edgelist[["to"]]
+          edgeTable[["weight"]] <- edgelist[["weight"]]
+
+          jaspResults[["edgeWeightTableContainer"]][[edgelistName]] <- edgeTable
+        }
+      }
+    }
+  }
+}
+
 .ln1NetCreateNetworkPlots <- function(jaspResults, dataset, options, dependencyFun) {
   if(is.null(jaspResults[["networkPlotContainer"]])) {
     jaspResults[["networkPlotContainer"]] <- createJaspContainer(title = gettext("Network Plots"))
@@ -197,6 +272,7 @@ Network <- function(jaspResults, dataset = NULL, options) {
       edgelistOptions <- options[["connectionList"]][[i]]
       if (edgelistOptions[["plotNetwork"]]) {
         edgelistName <- edgelistOptions[["name"]]
+        useAllConnections <- isTRUE(edgelistOptions[["allConnections"]])
         dataPlot <- createJaspPlot(
           title = edgelistName,
           height = 480,
@@ -209,18 +285,23 @@ Network <- function(jaspResults, dataset = NULL, options) {
             "plotStrengthColor", "plotStrengthWidth", "plotStrengthAlpha"
           ),
           nestedOptions = list(
+            c("connectionList", i, "name"),
             c("connectionList", i, "connections"),
+            c("connectionList", i, "allConnections"),
+            c("connectionList", i, "allConnectionStrengths"),
             c("connectionList", i, "plotNetwork")
           )
         )
 
-        selfLoops <- .ln1NetFindSelfLoops(edgelistOptions)
+        edgelistReady <- useAllConnections || .ln1NetCheckEdgelist(edgelistOptions, nodeNames)
+        selfLoops <- if (useAllConnections) character(0) else .ln1NetFindSelfLoops(edgelistOptions)
+
         if (length(selfLoops) > 0) {
           dataPlot$setError(gettextf(
             "A problem cannot be connected to itself. Please fix: %s.",
             paste(selfLoops, collapse = ", ")
           ))
-        } else if (.ln1NetCheckEdgelist(edgelistOptions, nodeNames)) {
+        } else if (edgelistReady) {
           edgelist <- jaspResults[["edgelistContainer"]][[edgelistName]]$object
           usedNodes <- unique(c(edgelist[["from"]], edgelist[["to"]]))
           nodeAttrs <- jaspResults[["nodeAttributesState"]]$object
@@ -358,7 +439,7 @@ Network <- function(jaspResults, dataset = NULL, options) {
 
   for (i in seq_along(options[["connectionList"]])) {
     edgelistOptions <- options[["connectionList"]][[i]]
-    if (.ln1NetCheckEdgelist(edgelistOptions, .ln1NetNodeNames(options))) {
+    if (isTRUE(edgelistOptions[["allConnections"]]) || .ln1NetCheckEdgelist(edgelistOptions, .ln1NetNodeNames(options))) {
       edgelistName <- edgelistOptions[["name"]]
       edgelistList[[edgelistName]] <- edgelistContainer[[edgelistName]]$object
       edgelistList[[edgelistName]][["name"]] <- edgelistName
@@ -368,28 +449,45 @@ Network <- function(jaspResults, dataset = NULL, options) {
   return(Reduce(rbind, edgelistList))
 }
 
-.ln1NetSaveProblems <- function(jaspResults, options) {
-  if (is.null(jaspResults[["problemSavePath"]])) {
-    problemSavePath <- createJaspState()
-    problemSavePath$dependOn(c("problems", "problemSavePath"))
-    jaspResults[["problemSavePath"]] <- problemSavePath
+.ln1NetSaveNetwork <- function(jaspResults, options) {
+  if (is.null(jaspResults[["networkSavePath"]])) {
+    networkSavePath <- createJaspState()
+    networkSavePath$dependOn(c("problems", "connectionList", "networkSavePath"))
+    jaspResults[["networkSavePath"]] <- networkSavePath
 
-    if (options[["problemSavePath"]] != "") {
+    if (options[["networkSavePath"]] != "") {
       nodeAttributes <- jaspResults[["nodeAttributesState"]]$object
-      utils::write.csv(nodeAttributes, file = options[["problemSavePath"]], row.names = FALSE)
-    }
-  }
-}
-
-.ln1NetSaveConnections <- function(jaspResults, options) {
-  if (is.null(jaspResults[["connectionSavePath"]])) {
-    connectionSavePath <- createJaspState()
-    connectionSavePath$dependOn(c("connectionList", "connectionSavePath"))
-    jaspResults[["connectionSavePath"]] <- connectionSavePath
-
-    if (options[["connectionSavePath"]] != "") {
       edgelistDf <- .ln1NetConcatenateEdgelists(jaspResults[["edgelistContainer"]], options)
-      utils::write.csv(edgelistDf[, c("name", "from", "to", "weight")], file = options[["connectionSavePath"]], row.names = FALSE)
+
+      # Build node rows: one per problem with severity, no edge info
+      nodeRows <- data.frame(
+        type     = "node",
+        time     = "",
+        name     = nodeAttributes[["name"]],
+        severity = nodeAttributes[["strength"]],
+        from     = "",
+        to       = "",
+        weight   = "",
+        stringsAsFactors = FALSE
+      )
+
+      # Build edge rows from concatenated edgelists
+      edgeRows <- NULL
+      if (!is.null(edgelistDf) && nrow(edgelistDf) > 0) {
+        edgeRows <- data.frame(
+          type     = "edge",
+          time     = edgelistDf[["name"]],
+          name     = "",
+          severity = "",
+          from     = edgelistDf[["from"]],
+          to       = edgelistDf[["to"]],
+          weight   = edgelistDf[["weight"]],
+          stringsAsFactors = FALSE
+        )
+      }
+
+      networkDf <- rbind(nodeRows, edgeRows)
+      utils::write.csv(networkDf, file = options[["networkSavePath"]], row.names = FALSE)
     }
   }
 }

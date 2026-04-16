@@ -30,20 +30,13 @@ Form
 		columns: 2
 
 		Common.IntroText{}
-
-		CheckBox
-		{
-			name: "plotData"
-			label: qsTr("Plot data")
-			checked: true
-			info: qsTr("Displays a plot of the data with time on the x-axis and the dependent variable on the y-axis, colored by phase.")
-		}
 	}
 
 	Section
 	{
 		title: qsTr("Data")
 		id: sectionData
+		expanded: true
 		columns:1
 		info: qsTr("Specify the data source: simulate data with configurable parameters or load variables from a dataset.")
 
@@ -207,13 +200,45 @@ Form
 				}
 			}
 		}
+
+		CIField { name: "coefficientCiLevel"; label: qsTr("Confidence interval"); info: qsTr("The confidence level for the coefficient confidence intervals.") }
 	}
 
 	Section
 	{
-		title: qsTr("Estimation Options")
-		info: qsTr("Additional analysis options.")
+		title: qsTr("Output Options")
+		info: qsTr("Configure which plots and tables are shown in the output.")
 
-		CIField { name: "coefficientCiLevel"; label: qsTr("Confidence interval"); info: qsTr("The confidence level for the coefficient confidence intervals.") }
+		CheckBox
+		{
+			name: "plotData"
+			label: qsTr("Plot data")
+			checked: true
+			info: qsTr("Displays a plot of the data with time on the x-axis and the dependent variable on the y-axis, colored by phase.")
+		}
+
+		CheckBox
+		{
+			name: "plotAnalysis"
+			label: qsTr("Plot analysis")
+			checked: true
+			info: qsTr("Displays the data with fitted regression lines per treatment phase, showing estimated level shifts and trend changes.")
+		}
+
+		CheckBox
+		{
+			name: "coefficientsTable"
+			label: qsTr("Coefficients table")
+			checked: false
+			info: qsTr("Displays the model coefficients with standard errors, t-values, p-values, and confidence intervals.")
+		}
+
+		CheckBox
+		{
+			name: "autocorrelationTable"
+			label: qsTr("Auto-correlation table")
+			checked: false
+			info: qsTr("Displays the estimated AR(1) auto-correlation coefficient with confidence interval.")
+		}
 	}
 }

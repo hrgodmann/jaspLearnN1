@@ -30,8 +30,12 @@ Treatment <- function(jaspResults, dataset = NULL, options) {
 
   .ln1TreatCreateDataPlot(jaspResults, dataset, options, .ln1TreatGetDataDependencies, ready)
   .ln1TreatEstimateModel(jaspResults, dataset, options, ready)
-  .ln1TreatCreateCoefficientsTable(jaspResults, options, ready)
-  .ln1TreatCreateAutoCorTable(jaspResults, options, ready)
+  .ln1TreatCreateAnalysisPlot(jaspResults, dataset, options, ready)
+
+  if (options[["coefficientsTable"]])
+    .ln1TreatCreateCoefficientsTable(jaspResults, options, ready)
+  if (options[["autocorrelationTable"]])
+    .ln1TreatCreateAutoCorTable(jaspResults, options, ready)
 
   return()
 }
@@ -168,7 +172,7 @@ Treatment <- function(jaspResults, dataset = NULL, options) {
 .ln1TreatCreateCoefficientsTable <- function(jaspResults, options, ready) {
   if (is.null(jaspResults[["coefTable"]])) {
     table <- createJaspTable(gettext("Coefficients"))
-    table$dependOn(c(.ln1TreatGetDataDependencies(), "coefficientCiLevel"))
+    table$dependOn(c(.ln1TreatGetDataDependencies(), "coefficientCiLevel", "coefficientsTable"))
 
     table$addColumnInfo(name = "name",         title = "",                        type = "string")
     table$addColumnInfo(name = "coef",         title = gettext("Estimate"),       type = "number")
@@ -212,7 +216,7 @@ Treatment <- function(jaspResults, dataset = NULL, options) {
 .ln1TreatCreateAutoCorTable <- function(jaspResults, options, ready) {
   if (is.null(jaspResults[["autoCorTable"]])) {
     table <- createJaspTable(gettext("Auto-correlation"))
-    table$dependOn(c(.ln1TreatGetDataDependencies(), "coefficientCiLevel"))
+    table$dependOn(c(.ln1TreatGetDataDependencies(), "coefficientCiLevel", "autocorrelationTable"))
 
     table$addColumnInfo(name = "name",         title = "",                        type = "string")
     table$addColumnInfo(name = "coef",         title = gettext("Estimate"),       type = "number")
@@ -287,6 +291,59 @@ Treatment <- function(jaspResults, dataset = NULL, options) {
     ) +
     jaspGraphs::geom_line() +
     jaspGraphs::geom_point() +
+    ggplot2::scale_x_continuous(
+      name = if (options[["inputType"]] == "loadData") xName else gettext("Time"),
+      breaks = xBreaks,
+      limits = range(xBreaks)
+    ) +
+    ggplot2::scale_y_continuous(breaks = yBreaks, limits = range(yBreaks)) +
+    jaspGraphs::geom_rangeframe() +
+    jaspGraphs::themeJaspRaw()
+
+  return(p)
+}
+
+.ln1TreatCreateAnalysisPlot <- function(jaspResults, dataset, options, ready) {
+  if (options[["plotAnalysis"]] && is.null(jaspResults[["analysisPlot"]])) {
+    analysisPlot <- createJaspPlot(
+      title = gettext("Analysis plot"),
+      height = 480,
+      width = 480,
+      position = 3
+    )
+    analysisPlot$dependOn(c("plotAnalysis", .ln1TreatGetDataDependencies()))
+    if (ready && !is.null(jaspResults[["modelState"]])) {
+      analysisPlot$plotObject <- .ln1TreatCreateAnalysisPlotFill(dataset, jaspResults[["modelState"]]$object, options)
+    }
+    jaspResults[["analysisPlot"]] <- analysisPlot
+  }
+}
+
+.ln1TreatCreateAnalysisPlotFill <- function(dataset, modelObject, options) {
+  variableNames <- .ln1GetVariableNames(options)
+
+  yName <- variableNames[["dependent"]]
+  xName <- variableNames[["t"]]
+  phaseName <- variableNames[["phase"]]
+
+  dataset[["fitted"]] <- as.numeric(fitted(modelObject))
+
+  xBreaks <- jaspGraphs::getPrettyAxisBreaks(dataset[[xName]])
+  yBreaks <- jaspGraphs::getPrettyAxisBreaks(c(dataset[[yName]], dataset[["fitted"]]))
+
+  p <- ggplot2::ggplot(
+      dataset,
+      mapping = ggplot2::aes(
+        x = .data[[xName]],
+        y = .data[[yName]],
+        color = .data[[phaseName]]
+      )
+    ) +
+    jaspGraphs::geom_point(alpha = 0.4) +
+    ggplot2::geom_line(
+      mapping = ggplot2::aes(y = .data[["fitted"]]),
+      linewidth = 1.2
+    ) +
     ggplot2::scale_x_continuous(
       name = if (options[["inputType"]] == "loadData") xName else gettext("Time"),
       breaks = xBreaks,

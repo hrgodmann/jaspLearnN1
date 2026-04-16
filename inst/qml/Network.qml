@@ -82,11 +82,21 @@ Form
 		{
 			childControlsArea.anchors.leftMargin: jaspTheme.contentMargin
 
+			CheckBox
+			{
+				id: allConnections
+				name: "allConnections"
+				label: qsTr("All possible connections")
+				checked: false
+				info: qsTr("When checked, automatically creates all possible directed connections between problems. Adjust the strength of each connection using the sliders.")
+			}
+
 			ComponentsList
 			{
 				id: connections
 				name: "connections"
 				title: qsTr("Problem Connections")
+				visible: !allConnections.checked
 				preferredWidth: connectionList.width - 2 * jaspTheme.contentMargin
 				minimumItems: 0
 				maximumItems: 20
@@ -133,6 +143,59 @@ Form
 				}
 			}
 
+			ComponentsList
+			{
+				name: "allConnectionStrengths"
+				visible: allConnections.checked
+				source: "problems.problemName"
+				title: qsTr("Connection Strengths")
+				preferredWidth: connectionList.width - 2 * jaspTheme.contentMargin
+				info: qsTr("Adjust the strength of each directed connection between problems.")
+				rowComponent: Group
+				{
+					id: fromGroup
+					preferredWidth: connectionList.width - 4 * jaspTheme.contentMargin
+					property string fromName: rowValue
+
+					Label
+					{
+						text: qsTr("From: %1").arg(rowValue)
+						font.bold: true
+					}
+
+					ComponentsList
+					{
+						name: "targets"
+						source: "problems.problemName"
+						preferredWidth: connectionList.width - 6 * jaspTheme.contentMargin
+						rowComponent: RowLayout
+						{
+							property bool isSelf: rowValue === fromGroup.fromName
+							visible: !isSelf
+							height: isSelf ? 0 : implicitHeight
+							spacing: 10 * preferencesModel.uiScale
+
+							Label
+							{
+								text: rowValue
+								Layout.preferredWidth: 120 * preferencesModel.uiScale
+							}
+
+							Slider
+							{
+								name: "connectionStrength"
+								value: 0
+								min: -1
+								max: 1
+								vertical: false
+								Layout.fillWidth: true
+								info: qsTr("The strength of this connection, ranging from -1 (strong negative) to 1 (strong positive).")
+							}
+						}
+					}
+				}
+			}
+
 			Group
 			{
 				title: qsTr("Options")
@@ -155,26 +218,25 @@ Form
 					checked: false
 					info: qsTr("Displays a table with in-degree and out-degree centrality for each problem at this time point.")
 				}
+
+				CheckBox
+				{
+					name: "edgeWeightTable"
+					label: qsTr("Edge weight table")
+					checked: false
+					info: qsTr("Displays a table listing all connections with their source, target, and weight for this time point.")
+				}
 			}
 		}
 	}
 
 	FileSelector
 	{
-		name:	"problemSavePath"
-		label:	qsTr("Save problems")
+		name:	"networkSavePath"
+		label:	qsTr("Save networks")
 		filter:	"*.csv"
 		save:	true
-		info:	qsTr("Saves the problem names and severity values to a .csv file.")
-	}
-
-	FileSelector
-	{
-		name:	"connectionSavePath"
-		label:	qsTr("Save connections")
-		filter:	"*.csv"
-		save:	true
-		info:	qsTr("Saves the connection definitions and strengths to a .csv file.")
+		info:	qsTr("Saves the full network (problems, severities, connections, and strengths) to a single .csv file.")
 	}
 
 	Section
@@ -207,8 +269,8 @@ Form
 				label: qsTr("Color palette")
 				info: qsTr("The color palette used for the severity fill in the network plot.")
 				values: [
-					{ label: qsTr("Viridis"),	value: "viridis" },
 					{ label: qsTr("Gray"),		value: "gray"	 },
+					{ label: qsTr("Viridis"),	value: "viridis" },
 					{ label: qsTr("Blue"),		value: "blue"	 }
 				]
 			}
