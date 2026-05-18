@@ -104,6 +104,7 @@ Network <- function(jaspResults, dataset = NULL, options) {
   }
   return(createJaspState(edges))
 }
+# test comment 
 
 .ln1NetFindSelfLoops <- function(edgelistOptions) {
   loops <- character(0)
