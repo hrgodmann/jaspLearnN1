@@ -32,8 +32,23 @@ Network <- function(jaspResults, dataset = NULL, options) {
 }
 
 .ln1NetIntroText <- function() {
-  return(gettext("VAR models allow therapists to examine how different psychological and behavioral variables influence each other dynamically over time, helping to uncover reciprocal relationships between symptoms and external factors. These models require multiple time series variables recorded over time, such as mood ratings, sleep patterns, and coping strategies. A distinguishing feature of VAR is its ability to model bidirectional influences, revealing feedback loops that might sustain or alleviate mental health issues. This can be particularly useful in identifying maladaptive cycles—such as anxiety leading to avoidance, which in turn reinforces anxiety—that might not be apparent through traditional analyses. The insights from VAR models can help personalize interventions by targeting the most influential nodes in a patient’s symptom network."))
+  return(gettext("PECAN (Perceived Causal Networks) is an approach used to map how individuals believe their symptoms, emotions, and behaviors influence one another. Instead of relying purely on statistical relationships, PECAN focuses on a client’s (or their therapists) own perception of causal connections within their psychological system. In clinical practice, PECAN can help make these perceived relationships explicit and structured. For example, a client may believe that poor sleep leads to increased anxiety, which in turn leads to avoidance behavior. By visualizing such connections, therapists and clients can gain insight into how problems are maintained and identify potential targets for intervention. 
+
+<b>How does it work?</b> 
+
+PECAN is typically based on self-reported data, where clients indicate how strongly they believe different variables influence each other. These variables can include symptoms (e.g., anxiety, mood), behaviors (e.g., avoidance), or contextual factors (e.g., stress). The result is a network structure in which nodes represent variables and connections represent perceived causal effects. Unlike purely data-driven models, PECAN captures subjective beliefs about causality. This makes it especially useful in therapy, as these beliefs often guide behavior and coping strategies. By mapping them, therapists can work together with clients to evaluate whether certain perceived relationships are helpful, accurate, or potentially maladaptive.
+PECAN can also be combined with time series data, allowing a comparison between perceived relationships and statistically estimated relationships (e.g., from VAR models). This can reveal discrepancies between what a client believes and what is observed in their data.
+
+<b>Practical considerations</b> 
+
+PECAN relies on the client’s insight and ability to reflect on their own experiences. As such, the quality of the network depends on how well the client can articulate perceived relationships. It may be helpful to guide clients through the process using structured prompts or examples. Because PECAN reflects subjective beliefs, it does not require large amounts of repeated measurements. However, it can be enriched by integrating it with longitudinal data, especially when used alongside other analytical approaches. 
+
+<b>Interpretation and limitations</b> 
+
+It is important to recognize that PECAN represents perceived causality, not necessarily actual causal mechanisms. Clients’ (and therapists’) beliefs may be incomplete, biased, or influenced by current mood or recent experiences. Nevertheless, these perceptions are clinically meaningful, as they can shape behavior and emotional responses. PECAN should therefore be used as a tool for discussion and hypothesis generation, rather than as definitive evidence about causal processes. When combined with other methods—such as forecasting or VAR models—it can provide a more comprehensive understanding of both subjective experience and observed dynamics.
+"))
 } 
+
 
 .ln1NetGetDataDependencies <- function() {
   return(c("problems", "connections"))
@@ -104,7 +119,6 @@ Network <- function(jaspResults, dataset = NULL, options) {
   }
   return(createJaspState(edges))
 }
-# test comment 
 
 .ln1NetFindSelfLoops <- function(edgelistOptions) {
   loops <- character(0)

@@ -41,9 +41,21 @@ Treatment <- function(jaspResults, dataset = NULL, options) {
 }
 
 .ln1TreatIntroText <- function() {
-  return(gettext("This model helps answer questions about how a patient's symptoms fluctuate over time and what factors predict changes in their mental health on an individual level. It requires repeated measures of symptom severity, behaviors, or other psychological variables over time, along with potential predictors like therapy interventions or daily stressors. A key feature is its ability to account for within-person variability while distinguishing stable patterns from momentary fluctuations. This is particularly useful for therapists aiming to tailor interventions based on a patient's unique response dynamics. Unlike group-level analyses, this approach provides individualized insights rather than assuming uniform effects across patients."))
-}
+  return(gettext("This method is used to examine how symptoms change over time within a single individual and whether these changes differ across treatment phases. It is particularly suitable for clinical questions such as whether symptom improvement is stronger during treatment compared to baseline, or whether specific interventions are associated with changes in symptom trajectories. 
 
+<b>How does it work?</b> 
+
+The model estimates symptom changes over time while accounting for autocorrelation, meaning that repeated measurements from the same individual are not independent (e.g., today’s symptom level is related to yesterday’s). It does this by fitting phase-specific regression lines (e.g., baseline and treatment) and modeling temporal dependencies between observations. This allows the model to separate overall trends (systematic change across time or phases) from short-term fluctuations in symptoms. To apply this method, repeated measurements of symptoms or other clinical outcomes are required across multiple time points, preferably at least 10 observations per phase. Additional predictors, such as treatment type, stress levels, or contextual factors, can also be included to explain variation over time.
+
+<b>Practical considerations</b> 
+
+Common research questions include whether symptoms decrease more rapidly during treatment than during baseline, or whether different treatment conditions lead to different rates of improvement. A key modelling decision is how time is coded within each phase (e.g., starting at zero at the beginning or end of a phase), as this directly influences the interpretation of change estimates. The model typically assumes linear change within phases and a specific autocorrelation structure (often AR(1)).
+
+<b>Interpretation and limitations</b> 
+
+Results should be interpreted with caution, as violations of model assumptions or insufficient numbers of observations can lead to biased or unstable estimates. In particular, small sample sizes per phase reduce reliability. Therefore, findings should be considered as one source of evidence about individual change and ideally interpreted alongside clinical judgment and other outcome measures.
+"))
+} 
 .ln1TreatData <- function(jaspResults, dataset, options, ready) {
   if (!ready)
     return(NULL)
