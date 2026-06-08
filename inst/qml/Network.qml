@@ -17,6 +17,7 @@
 //
 
 import QtQuick
+import QtQuick.Controls as QtControls
 import QtQuick.Layouts
 import JASP
 import JASP.Controls
@@ -57,14 +58,63 @@ Form
 				info: qsTr("The name of this problem.")
 			}
 
-			Slider
+			RowLayout
 			{
-				name: "problemSeverity"
-				value: 0.5
-				min: 0
-				max: 1
-				vertical: false
-				info: qsTr("The severity of this problem, ranging from 0 (none) to 1 (maximum).")
+				spacing: 8 * preferencesModel.uiScale
+
+				QtControls.Slider
+				{
+					id: problemSeveritySlider
+					from: 0
+					to: 1
+					stepSize: 0.01
+					snapMode: QtControls.Slider.SnapAlways
+					value: 0.5
+					Layout.preferredWidth: 260 * preferencesModel.uiScale
+					onMoved: problemSeverity.value = Math.round(value * 100) / 100
+
+					background: Rectangle
+					{
+						x: problemSeveritySlider.leftPadding
+						y: problemSeveritySlider.topPadding + problemSeveritySlider.availableHeight / 2 - height / 2
+						width: problemSeveritySlider.availableWidth
+						height: 6 * preferencesModel.uiScale
+						radius: height / 2
+						color: jaspTheme.sliderPartOff
+
+						Rectangle
+						{
+							width: problemSeveritySlider.visualPosition * parent.width
+							height: parent.height
+							radius: parent.radius
+							color: jaspTheme.sliderPartOn
+						}
+					}
+
+					handle: Rectangle
+					{
+						x: problemSeveritySlider.leftPadding + problemSeveritySlider.visualPosition * (problemSeveritySlider.availableWidth - width)
+						y: problemSeveritySlider.topPadding + problemSeveritySlider.availableHeight / 2 - height / 2
+						implicitWidth: 16 * preferencesModel.uiScale
+						implicitHeight: 16 * preferencesModel.uiScale
+						radius: width / 2
+						color: problemSeveritySlider.pressed ? jaspTheme.itemSelectedColor : jaspTheme.controlBackgroundColor
+						border.color: jaspTheme.borderColor
+					}
+				}
+
+				DoubleField
+				{
+					id: problemSeverity
+					name: "problemSeverity"
+					defaultValue: 0.5
+					min: 0
+					max: 1
+					decimals: 2
+					fieldWidth: 55 * preferencesModel.uiScale
+					info: qsTr("The severity of this problem, ranging from 0 (none) to 1 (maximum).")
+					onValueChanged: problemSeveritySlider.value = Number(value)
+				}
 			}
 		}
 	}
@@ -111,7 +161,7 @@ Form
 				{
 					Layout.columnSpan: 4
 
-					spacing: 72 * preferencesModel.uiScale
+					spacing: 24 * preferencesModel.uiScale
 
 					DropDown
 					{
@@ -131,14 +181,64 @@ Form
 						info: qsTr("The target problem of this connection.")
 					}
 
-					Slider
+					RowLayout
 					{
-						name: "connectionStrength"
-						value: 0
-						min: -1
-						max: 1
-						vertical: false
-						info: qsTr("The strength of this connection, ranging from -1 (strong negative) to 1 (strong positive).")
+						spacing: 8 * preferencesModel.uiScale
+
+						QtControls.Slider
+						{
+							id: connectionStrengthSlider
+							from: -1
+							to: 1
+							stepSize: 0.01
+							snapMode: QtControls.Slider.SnapAlways
+							value: 0
+							Layout.preferredWidth: 260 * preferencesModel.uiScale
+							onMoved: connectionStrength.value = Math.round(value * 100) / 100
+
+							background: Rectangle
+							{
+								x: connectionStrengthSlider.leftPadding
+								y: connectionStrengthSlider.topPadding + connectionStrengthSlider.availableHeight / 2 - height / 2
+								width: connectionStrengthSlider.availableWidth
+								height: 6 * preferencesModel.uiScale
+								radius: height / 2
+								color: jaspTheme.sliderPartOff
+
+								Rectangle
+								{
+									width: connectionStrengthSlider.visualPosition * parent.width
+									height: parent.height
+									radius: parent.radius
+									color: jaspTheme.sliderPartOn
+								}
+							}
+
+							handle: Rectangle
+							{
+								x: connectionStrengthSlider.leftPadding + connectionStrengthSlider.visualPosition * (connectionStrengthSlider.availableWidth - width)
+								y: connectionStrengthSlider.topPadding + connectionStrengthSlider.availableHeight / 2 - height / 2
+								implicitWidth: 16 * preferencesModel.uiScale
+								implicitHeight: 16 * preferencesModel.uiScale
+								radius: width / 2
+								color: connectionStrengthSlider.pressed ? jaspTheme.itemSelectedColor : jaspTheme.controlBackgroundColor
+								border.color: jaspTheme.borderColor
+							}
+						}
+
+						DoubleField
+						{
+							id: connectionStrength
+							name: "connectionStrength"
+							defaultValue: 0
+							min: -1
+							max: 1
+							negativeValues: true
+							decimals: 2
+							fieldWidth: 55 * preferencesModel.uiScale
+							info: qsTr("The strength of this connection, ranging from -1 (strong negative) to 1 (strong positive).")
+							onValueChanged: connectionStrengthSlider.value = Number(value)
+						}
 					}
 				}
 			}
@@ -181,15 +281,66 @@ Form
 								Layout.preferredWidth: 120 * preferencesModel.uiScale
 							}
 
-							Slider
+							RowLayout
 							{
-								name: "connectionStrength"
-								value: 0
-								min: -1
-								max: 1
-								vertical: false
+								spacing: 8 * preferencesModel.uiScale
 								Layout.fillWidth: true
-								info: qsTr("The strength of this connection, ranging from -1 (strong negative) to 1 (strong positive).")
+
+								QtControls.Slider
+								{
+									id: allConnectionStrengthSlider
+									from: -1
+									to: 1
+									stepSize: 0.01
+									snapMode: QtControls.Slider.SnapAlways
+									value: 0
+									Layout.preferredWidth: 260 * preferencesModel.uiScale
+									Layout.fillWidth: true
+									onMoved: allConnectionStrength.value = Math.round(value * 100) / 100
+
+									background: Rectangle
+									{
+										x: allConnectionStrengthSlider.leftPadding
+										y: allConnectionStrengthSlider.topPadding + allConnectionStrengthSlider.availableHeight / 2 - height / 2
+										width: allConnectionStrengthSlider.availableWidth
+										height: 6 * preferencesModel.uiScale
+										radius: height / 2
+										color: jaspTheme.sliderPartOff
+
+										Rectangle
+										{
+											width: allConnectionStrengthSlider.visualPosition * parent.width
+											height: parent.height
+											radius: parent.radius
+											color: jaspTheme.sliderPartOn
+										}
+									}
+
+									handle: Rectangle
+									{
+										x: allConnectionStrengthSlider.leftPadding + allConnectionStrengthSlider.visualPosition * (allConnectionStrengthSlider.availableWidth - width)
+										y: allConnectionStrengthSlider.topPadding + allConnectionStrengthSlider.availableHeight / 2 - height / 2
+										implicitWidth: 16 * preferencesModel.uiScale
+										implicitHeight: 16 * preferencesModel.uiScale
+										radius: width / 2
+										color: allConnectionStrengthSlider.pressed ? jaspTheme.itemSelectedColor : jaspTheme.controlBackgroundColor
+										border.color: jaspTheme.borderColor
+									}
+								}
+
+								DoubleField
+								{
+									id: allConnectionStrength
+									name: "connectionStrength"
+									defaultValue: 0
+									min: -1
+									max: 1
+									negativeValues: true
+									decimals: 2
+									fieldWidth: 55 * preferencesModel.uiScale
+									info: qsTr("The strength of this connection, ranging from -1 (strong negative) to 1 (strong positive).")
+									onValueChanged: allConnectionStrengthSlider.value = Number(value)
+								}
 							}
 						}
 					}
