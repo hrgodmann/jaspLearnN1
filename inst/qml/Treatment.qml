@@ -125,12 +125,12 @@ Form
 					DoubleField
 					{
 						name: "simTimeEffectAutocorrelation"
-						label: qsTr("Auto-correlation")
+						label: qsTr("Autocorrelation")
 						defaultValue: 0
 						min: -1
 						max: 1
 						negativeValues: true
-						info: qsTr("The first-order auto-correlation of the noise process. Values range from -1 to 1.")
+						info: qsTr("The first-order autocorrelation of the noise process. Values range from -1 to 1.")
 					}
 				}
 			}
@@ -236,9 +236,9 @@ Form
 		CheckBox
 		{
 			name: "autocorrelationTable"
-			label: qsTr("Auto-correlation table")
+			label: qsTr("Autocorrelation table")
 			checked: false
-			info: qsTr("Displays the estimated AR(1) auto-correlation coefficient with confidence interval.")
+			info: qsTr("Displays the estimated AR(1) autocorrelation coefficient with confidence interval.")
 		}
 	}
 }

@@ -201,6 +201,80 @@ Form
 
 	Section
 	{
+		title: qsTr("Model")
+		info: qsTr("Specify how the ARIMA model is selected.")
+
+		RadioButtonGroup
+		{
+			name: "modelSpecification"
+			title: qsTr("Model specification")
+			info: qsTr("Choose whether the ARIMA order is selected automatically or specified manually.")
+
+			RadioButton
+			{
+				value: "auto"
+				id: autoModel
+				label: qsTr("Automatic")
+				checked: true
+				info: qsTr("Automatically selects the best-fitting ARIMA model using the selected information criterion.")
+
+				RadioButtonGroup
+				{
+					name: "modelSpecificationAutoIc"
+					title: qsTr("Information criterion")
+					radioButtonsOnSameRow: true
+					info: qsTr("The information criterion used for automatic ARIMA model selection.")
+
+					RadioButton { value: "aicc";	label: qsTr("AICc");	checked: true;	info: qsTr("Corrected Akaike information criterion.") }
+					RadioButton { value: "aic";	label: qsTr("AIC");						info: qsTr("Akaike information criterion.") }
+					RadioButton { value: "bic";	label: qsTr("BIC");						info: qsTr("Bayesian information criterion.") }
+				}
+			}
+
+			RadioButton
+			{
+				value: "custom"
+				id: manualModel
+				label: qsTr("Manual")
+				info: qsTr("Fits an ARIMA model with the specified nonseasonal orders.")
+
+				Group
+				{
+					columns: 1
+
+					IntegerField
+					{
+						name: "p"
+						label: qsTr("Autoregressive (AR) order p")
+						defaultValue: 1
+						min: 0
+						info: qsTr("The autoregressive order of the fitted ARIMA model.")
+					}
+
+					IntegerField
+					{
+						name: "d"
+						label: qsTr("Difference (I) degree d")
+						defaultValue: 0
+						min: 0
+						info: qsTr("The differencing order of the fitted ARIMA model.")
+					}
+
+					IntegerField
+					{
+						name: "q"
+						label: qsTr("Moving average (MA) order q")
+						defaultValue: 0
+						min: 0
+						info: qsTr("The moving average order of the fitted ARIMA model.")
+					}
+				}
+			}
+		}
+	}
+
+	Section
+	{
 		title: qsTr("Output Options")
 		info: qsTr("Configure which plots and tables are shown in the output.")
 

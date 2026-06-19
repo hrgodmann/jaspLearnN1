@@ -70,7 +70,7 @@ Form
 					stepSize: 0.01
 					snapMode: QtControls.Slider.SnapAlways
 					value: 0.5
-					Layout.preferredWidth: 260 * preferencesModel.uiScale
+					Layout.preferredWidth: 234 * preferencesModel.uiScale
 					onMoved: problemSeverity.value = Math.round(value * 100) / 100
 
 					background: Rectangle
@@ -193,7 +193,7 @@ Form
 							stepSize: 0.01
 							snapMode: QtControls.Slider.SnapAlways
 							value: 0
-							Layout.preferredWidth: 260 * preferencesModel.uiScale
+							Layout.preferredWidth: 234 * preferencesModel.uiScale
 							onMoved: connectionStrength.value = Math.round(value * 100) / 100
 
 							background: Rectangle
@@ -294,8 +294,7 @@ Form
 									stepSize: 0.01
 									snapMode: QtControls.Slider.SnapAlways
 									value: 0
-									Layout.preferredWidth: 260 * preferencesModel.uiScale
-									Layout.fillWidth: true
+									Layout.preferredWidth: 234 * preferencesModel.uiScale
 									onMoved: allConnectionStrength.value = Math.round(value * 100) / 100
 
 									background: Rectangle

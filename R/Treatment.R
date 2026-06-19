@@ -227,7 +227,7 @@ Results should be interpreted with caution, as violations of model assumptions o
 
 .ln1TreatCreateAutoCorTable <- function(jaspResults, options, ready) {
   if (is.null(jaspResults[["autoCorTable"]])) {
-    table <- createJaspTable(gettext("Auto-correlation"))
+    table <- createJaspTable(gettext("Autocorrelation"))
     table$dependOn(c(.ln1TreatGetDataDependencies(), "coefficientCiLevel", "autocorrelationTable"))
 
     table$addColumnInfo(name = "name",         title = "",                        type = "string")
@@ -264,7 +264,7 @@ Results should be interpreted with caution, as violations of model assumptions o
     table[["lower"]] <- ciAutoCor[["lower"]]
     table[["upper"]] <- ciAutoCor[["upper"]]
   } else {
-    table$addFootnote(gettext("Confidence intervals for the auto-correlation could not be computed. The point estimate may be near the boundary of the parameter space."))
+    table$addFootnote(gettext("Confidence intervals for the autocorrelation could not be computed. The point estimate may be near the boundary of the parameter space."))
   }
 }
 

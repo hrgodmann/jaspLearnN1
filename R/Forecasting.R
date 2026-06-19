@@ -143,6 +143,11 @@ Forecasting provides an prediction on the future clinical outcome. Note that -ju
     "simArEffects",
     "simIEffect",
     "simMaEffects",
+    "modelSpecification",
+    "modelSpecificationAutoIc",
+    "p",
+    "d",
+    "q",
     "numSamples",
     "seed"
   ))
@@ -185,11 +190,28 @@ Forecasting provides an prediction on the future clinical outcome. Note that -ju
 }
 
 .ln1ForeEstimateModelHelper <- function(dataset, options) {
-  mod <- try(forecast::auto.arima(
-    dataset[["y"]],
-    allowdrift = TRUE,
-    allowmean = TRUE
-  ))
+  modelSpecification <- options[["modelSpecification"]]
+  if (is.null(modelSpecification) || modelSpecification == "")
+    modelSpecification <- "auto"
+
+  if (modelSpecification == "custom") {
+    mod <- try(forecast::Arima(
+      dataset[["y"]],
+      order = c(options[["p"]], options[["d"]], options[["q"]]),
+      include.constant = TRUE
+    ))
+  } else {
+    autoIc <- options[["modelSpecificationAutoIc"]]
+    if (is.null(autoIc) || autoIc == "")
+      autoIc <- "aicc"
+
+    mod <- try(forecast::auto.arima(
+      dataset[["y"]],
+      allowdrift = TRUE,
+      allowmean = TRUE,
+      ic = autoIc
+    ))
+  }
 
   if (jaspBase::isTryError(mod)) {
     .quitAnalysis(jaspBase::.extractErrorMessage(mod))
