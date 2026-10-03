@@ -63,14 +63,15 @@ Form
 				name:			"time"
 				title:			qsTr("Time")
 				singleVariable: true
-				info:			qsTr("The time variable indicating when each observation was recorded.")
+				allowedColumns: ["scale"]
+				info:			qsTr("Numeric, equally spaced measurement times. Rows are ordered by this variable. Include a row for each measurement occasion, including missing outcomes. Without a time variable, row order defines consecutive measurement steps.")
 			}
 			AssignedVariablesList
 			{
 				name:			"covariates"
 				title:			qsTr("Covariates")
 				allowedColumns:	["scale"]
-				info:			qsTr("Additional predictor variables to include in the model.")
+				info:			qsTr("Numeric predictors fitted jointly with ARIMA errors. Historical predictor values must be complete. To forecast, append rows with an empty outcome and a value for every predictor at every requested future time. These can be known values or an explicit scenario.")
 			}
 		}
 
@@ -306,7 +307,7 @@ Form
 	Section
 	{
 		title: qsTr("Forecasting")
-		info: qsTr("Configure and display forecasts based on the fitted ARIMA model.")
+		info: qsTr("Forecasts start after the last observed outcome. With covariates, append future rows containing all predictor values and leave the outcome empty. Fill in future times too if a time variable is selected. Prediction intervals are conditional on these supplied values and do not include uncertainty in the predictor scenario.")
 		IntegerField
 		{
 			name: "forecastLength"
@@ -315,7 +316,7 @@ Form
 			min: 0
 			max: 1e6
 			defaultValue: 0
-			info: qsTr("Determines the number forecasts to make.")
+			info: qsTr("The number of measurement steps to forecast after the last observed outcome. With covariates, supply at least this many future rows; only the requested rows are used.")
 		}
 		FileSelector
 		{

@@ -56,7 +56,7 @@ Form
 				title:				qsTr("Dependent Variable")
 				allowedColumns:		["scale"]
 				singleVariable:		true
-				info:				qsTr("The outcome variable measured over time (e.g., symptom severity).")
+				info:				qsTr("The outcome measured over time (e.g., symptom severity). For a missing measurement, keep the row and fill in its time and phase, leaving only the outcome empty. Missing outcomes are not imputed.")
 			}
 			AssignedVariablesList
 			{
@@ -64,7 +64,7 @@ Form
 				title:			qsTr("Time")
 				allowedColumns:	["scale"]
 				singleVariable:	true
-				info:			qsTr("The time variable indicating when each observation was recorded.")
+				info:			qsTr("A continuous numeric time variable across all phases. Values must be complete, unique and equally spaced; rows are sorted by time. Do not restart time at each phase. Keep a row for every missing measurement occasion. The selected values also define the time scale of the regression trends.")
 			}
 			AssignedVariablesList
 			{
@@ -72,7 +72,7 @@ Form
 				title:			qsTr("Phase Variable")
 				allowedColumns:	["nominal"]
 				singleVariable:	true
-				info:			qsTr("A categorical variable indicating the treatment phase (e.g., pre-treatment, treatment, post-treatment).")
+				info:			qsTr("A categorical variable indicating the treatment phase (e.g., pre-treatment, treatment, post-treatment). Every row needs a phase, including missing outcomes. Autocorrelation continues across phase boundaries.")
 			}
 		}
 
@@ -119,7 +119,7 @@ Form
 						label: qsTr("Effect")
 						defaultValue: 0.0
 						negativeValues: true
-						info: qsTr("The linear effect of time on the dependent variable.")
+						info: qsTr("The linear effect of time on the dependent variable. In simulations, regression time starts at 1 within each phase; autocorrelation uses a continuous sequence across all phases.")
 					}
 
 					DoubleField
@@ -201,7 +201,44 @@ Form
 			}
 		}
 
-		CIField { name: "coefficientCiLevel"; label: qsTr("Confidence interval"); info: qsTr("The confidence level for the coefficient confidence intervals.") }
+		CIField { name: "coefficientCiLevel"; label: qsTr("Confidence interval"); info: qsTr("The confidence level for model coefficients, phase comparisons, phase estimates, and autocorrelation.") }
+	}
+
+	Section
+	{
+		title: qsTr("Phase Comparisons")
+		expanded: true
+		columns: 1
+
+		CheckBox
+		{
+			name: "phaseComparisons"
+			label: qsTr("Compare phase endpoints and slopes")
+			checked: true
+			info: qsTr("Reports the comparison phase minus the reference phase for fitted endpoint levels and slopes. Each endpoint is evaluated at that phase's own last scheduled time, including a scheduled time with a missing outcome; this is not a change at treatment onset. Slopes describe change per unit of forward time. Confidence intervals and p-values use approximate inference from the AR(1) model estimated by REML and may be unreliable in short series or with strong autocorrelation.")
+
+			DropDown
+			{
+				name: "comparisonPhase"
+				label: qsTr("Compared phase")
+				source: inputType.value == "simulateData" ? ["simPhaseEffects.simPhaseName"] : [{name: "phase", use: "levels"}]
+				addEmptyValue: true
+				indexDefaultValue: 0
+				placeholderText: qsTr("Second phase in time (automatic)")
+				info: qsTr("Choose the phase from which the reference phase is subtracted. The automatic choice is the second phase in chronological order of first occurrence, not alphabetical order.")
+			}
+
+			DropDown
+			{
+				name: "referencePhase"
+				label: qsTr("Reference phase")
+				source: inputType.value == "simulateData" ? ["simPhaseEffects.simPhaseName"] : [{name: "phase", use: "levels"}]
+				addEmptyValue: true
+				indexDefaultValue: 0
+				placeholderText: qsTr("First phase in time (automatic)")
+				info: qsTr("Choose the phase subtracted from the comparison phase. The automatic choice is the first phase in chronological order of first occurrence, not alphabetical order.")
+			}
+		}
 	}
 
 	Section
@@ -227,10 +264,18 @@ Form
 
 		CheckBox
 		{
+			name: "phaseSummary"
+			label: qsTr("Phase estimates")
+			checked: false
+			info: qsTr("Reports each phase's fitted level at its own last scheduled time and its slope per unit of forward time, with confidence intervals. A missing outcome at the last scheduled time does not move the endpoint to an earlier measurement.")
+		}
+
+		CheckBox
+		{
 			name: "coefficientsTable"
 			label: qsTr("Coefficients table")
 			checked: false
-			info: qsTr("Displays the model coefficients with standard errors, t-values, p-values, and confidence intervals.")
+			info: qsTr("Displays the model coefficients with standard errors, t-values, p-values, and confidence intervals. Intercept and phase main-effect coefficients describe levels and differences at regression time 0. Use Phase Comparisons for differences between named phases at their own endpoints and between their slopes.")
 		}
 
 		CheckBox
@@ -238,7 +283,7 @@ Form
 			name: "autocorrelationTable"
 			label: qsTr("Autocorrelation table")
 			checked: false
-			info: qsTr("Displays the estimated AR(1) autocorrelation coefficient with confidence interval.")
+			info: qsTr("Displays the estimated residual correlation over one measurement interval, with confidence interval. Missing measurements preserve the elapsed number of intervals.")
 		}
 	}
 }

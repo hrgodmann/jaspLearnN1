@@ -46,7 +46,7 @@ Form
 			{"problemName": qsTr("Problem 2"), "problemSeverity": 0.5},
 			{"problemName": qsTr("Problem 3"), "problemSeverity": 0.5}
 		]
-		info: qsTr("Define the problems (symptoms) and their severity. Use the slider to set the severity of each problem between 0 and 1.")
+		info: qsTr("Define the problems (symptoms) and their severity. Use the slider to set the severity of each problem between 0 and 1. Every selected problem remains in the network, including problems without connections.")
 
 		rowComponent: RowLayout
 		{
@@ -127,7 +127,7 @@ Form
 		maximumItems: 10
 		newItemName: qsTr("Time ") + (connectionList.count + 1)
 		optionKey: "name"
-		info: qsTr("Each tab represents a time point. Define the connections between problems and their strengths for each time point.")
+		info: qsTr("Each tab represents an assessment occasion. Use its name to identify the occasion or reference period. Rate all connections within a tab for the same period and context.")
 		content: Group
 		{
 			childControlsArea.anchors.leftMargin: jaspTheme.contentMargin
@@ -151,7 +151,7 @@ Form
 				minimumItems: 0
 				maximumItems: 20
 				headerLabels: [qsTr("From"), qsTr("To"), qsTr("Strength")]
-				info: qsTr("Define the directed connections between problems. Select the source and target problems, and set the strength of each connection.")
+				info: qsTr("Define perceived directed connections for the period represented by this tab. A positive rating means that an increase in the source increases the target; a negative rating means that it decreases the target. Rate the perceived strength, not your certainty. To show a network without connections, remove all rows. An unfinished row must be completed or removed.")
 				defaultValues: connectionList.count === 1 ? [
 					{"connectionFrom": qsTr("Problem 1"), "connectionTo": qsTr("Problem 2"), "connectionStrength": 0.5},
 					{"connectionFrom": qsTr("Problem 2"), "connectionTo": qsTr("Problem 3"), "connectionStrength": -0.5},
@@ -236,7 +236,7 @@ Form
 							negativeValues: true
 							decimals: 2
 							fieldWidth: 55 * preferencesModel.uiScale
-							info: qsTr("The strength of this connection, ranging from -1 (strong negative) to 1 (strong positive).")
+							info: qsTr("Perceived connection strength: -1 means the strongest decreasing relationship, 0 means no perceived relationship, and 1 means the strongest increasing relationship. Positive and negative do not automatically mean harmful and helpful. Zero does not mean unknown or not yet rated.")
 							onValueChanged: connectionStrengthSlider.value = Number(value)
 						}
 					}
@@ -337,7 +337,7 @@ Form
 									negativeValues: true
 									decimals: 2
 									fieldWidth: 55 * preferencesModel.uiScale
-									info: qsTr("The strength of this connection, ranging from -1 (strong negative) to 1 (strong positive).")
+									info: qsTr("Perceived connection strength: -1 means the strongest decreasing relationship, 0 means no perceived relationship, and 1 means the strongest increasing relationship. Positive and negative do not automatically mean harmful and helpful. Zero does not mean unknown or not yet rated.")
 									onValueChanged: allConnectionStrengthSlider.value = Number(value)
 								}
 							}
@@ -358,15 +358,15 @@ Form
 					name: "plotNetwork"
 					label: qsTr("Network plot")
 					checked: true
-					info: qsTr("Displays a network plot for this time point showing problems as nodes and connections as edges.")
+					info: qsTr("Displays a network plot for this time point showing all selected problems as nodes. Zero-rated connections produce no arrow; their ratings remain in the edge weight table and CSV export.")
 				}
 
 				CheckBox
 				{
 					name: "centrality"
-					label: qsTr("Centrality statistics")
+					label: qsTr("Connection summaries")
 					checked: false
-					info: qsTr("Displays a table with in-degree and out-degree centrality for each problem at this time point.")
+					info: qsTr("Shows severity separately from incoming and outgoing connections. For each direction, absolute strength sums the magnitudes of the ratings, while signed sum retains their positive or negative signs. Opposite signs can cancel in the signed sum. These summaries describe perceived connections and do not determine treatment priorities.")
 				}
 
 				CheckBox
@@ -382,11 +382,46 @@ Form
 
 	FileSelector
 	{
+		id:		networkSavePath
 		name:	"networkSavePath"
-		label:	qsTr("Save networks")
+		label:	qsTr("CSV destination")
 		filter:	"*.csv"
 		save:	true
-		info:	qsTr("Saves the full network (problems, severities, connections, and strengths) to a single .csv file.")
+		info:	qsTr("Choose a destination for the CSV. Selecting a destination or editing the network does not write a file. Press Export CSV / Save again to export completed assessments. The Network export status names exported and omitted assessments. Problems without connections and completed empty assessments are included. If no assessments are complete, no file is written.")
+	}
+
+	Button
+	{
+		label: qsTr("Export CSV / Save again")
+		info: qsTr("Writes the current completed assessments to the selected CSV destination. An existing file at that destination will be replaced. Press again to retry after a save failure.")
+		enabled: networkSavePath.value != "" && networkExportSession.value != ""
+		onClicked: networkExportRequest.checked = !networkExportRequest.checked
+		CheckBox
+		{
+			id: networkExportRequest
+			name: "networkExportRequest"
+			checked: false
+			visible: false
+			onInitializedChanged: if (initialized) checked = false
+		}
+	}
+
+	TextField
+	{
+		id: networkExportSession
+		name: "networkExportSession"
+		value: ""
+		visible: false
+		// Initialization binds saved values before this signal and blocks analysis
+		// updates until every control is ready. Never reuse a saved export session.
+		onInitializedChanged: if (initialized) value = "session-" + Date.now() + "-" + Math.random()
+	}
+
+	Label
+	{
+		text: qsTr("Only Export CSV / Save again writes the file. An existing file at the selected destination will be replaced.")
+		wrapMode: Text.WordWrap
+		Layout.preferredWidth: 400 * preferencesModel.uiScale
 	}
 
 	Section

@@ -18,6 +18,8 @@
 Network <- function(jaspResults, dataset = NULL, options) {
   jaspResults$title <- gettext("How Are Symptoms Connected?")
 
+  .ln1NetUpgradeState(jaspResults)
+
   .ln1Intro(jaspResults, options, .ln1NetIntroText)
 
   .ln1NetData(jaspResults, dataset, options)
@@ -51,7 +53,7 @@ It is important to recognize that PECAN represents perceived causality, not nece
 
 
 .ln1NetGetDataDependencies <- function() {
-  return(c("problems", "connections"))
+  return(c("problems", "connectionList"))
 }
 
 .ln1NetData <- function(jaspResults, dataset, options) {
@@ -69,7 +71,7 @@ It is important to recognize that PECAN represents perceived causality, not nece
 .ln1NetEdgelists <- function(jaspResults, options) {
   if(is.null(jaspResults[["edgelistContainer"]])) {
     edgelistContainer <- createJaspContainer()
-    edgelistContainer$dependOn("problems")
+    edgelistContainer$dependOn(.ln1NetGetDataDependencies())
     jaspResults[["edgelistContainer"]] <- edgelistContainer
   }
 
@@ -77,18 +79,14 @@ It is important to recognize that PECAN represents perceived causality, not nece
   for (i in seq_along(options[["connectionList"]])) {
     edgelistOptions <- options[["connectionList"]][[i]]
     edgelistName <- edgelistOptions[["name"]]
+    if (!.ln1NetEdgelistReady(edgelistOptions, nodeNames))
+      next
     if (isTRUE(edgelistOptions[["allConnections"]])) {
       edgelistState <- .ln1NetAllEdges(edgelistOptions[["allConnectionStrengths"]], nodeNames)
-      edgelistState$dependOn(nestedOptions = list(
-        c("connectionList", i, "allConnections"),
-        c("connectionList", i, "allConnectionStrengths")
-      ))
-      jaspResults[["edgelistContainer"]][[edgelistName]] <- edgelistState
-    } else if (.ln1NetCheckEdgelist(edgelistOptions, nodeNames)) {
+    } else {
       edgelistState <- .ln1NetSingleEdgelist(edgelistOptions)
-      edgelistState$dependOn(nestedOptions = list(c("connectionList", i, "connections")))
-      jaspResults[["edgelistContainer"]][[edgelistName]] <- edgelistState
     }
+    jaspResults[["edgelistContainer"]][[edgelistName]] <- edgelistState
   }
 }
 
@@ -97,9 +95,7 @@ It is important to recognize that PECAN represents perceived causality, not nece
 }
 
 .ln1NetAllEdges <- function(allConnStrengths, nodeNames) {
-  edges <- data.frame(from = character(0), to = character(0),
-                      weight = numeric(0), absWeight = numeric(0),
-                      stringsAsFactors = FALSE)
+  edges <- .ln1NetEmptyEdgelist()
   for (i in seq_along(allConnStrengths)) {
     fromName <- nodeNames[i]
     if (is.na(fromName) || fromName == "") next
@@ -125,24 +121,31 @@ It is important to recognize that PECAN represents perceived causality, not nece
   for (path in edgelistOptions[["connections"]]) {
     from <- path[["connectionFrom"]]
     to   <- path[["connectionTo"]]
-    if (from != "" && to != "" && from == to)
+    if (isTRUE(nzchar(from)) && isTRUE(nzchar(to)) && isTRUE(from == to))
       loops <- c(loops, from)
   }
   return(unique(loops))
 }
 
 .ln1NetCheckEdgelist <- function(edgelistOptions, nodeNames = NULL) {
-  return(all(sapply(edgelistOptions[["connections"]], function(path) {
+  connections <- edgelistOptions[["connections"]]
+  if (is.null(connections))
+    return(FALSE)
+  return(all(vapply(connections, function(path) {
     from <- path[["connectionFrom"]]
     to   <- path[["connectionTo"]]
-    valid <- from != "" && to != "" && from != to
+    valid <- isTRUE(nzchar(from)) && isTRUE(nzchar(to)) &&
+      isTRUE(from != to) && .ln1NetValidStrength(path[["connectionStrength"]])
     if (valid && !is.null(nodeNames))
       valid <- from %in% nodeNames && to %in% nodeNames
     return(valid)
-  })))
+  }, logical(1))))
 }
 
 .ln1NetSingleEdgelist <- function(edgelistOptions) {
+  if (length(edgelistOptions[["connections"]]) == 0L)
+    return(createJaspState(.ln1NetEmptyEdgelist()))
+
   edgelist <- data.frame(t(sapply(edgelistOptions[["connections"]], function(path) {
     return(c(path[["connectionFrom"]], path[["connectionTo"]], path[["connectionStrength"]]))
   })))
@@ -155,10 +158,12 @@ It is important to recognize that PECAN represents perceived causality, not nece
 .ln1NetCentrality <- function(jaspResults, options) {
   if (is.null(jaspResults[["centralityContainer"]])) {
     jaspResults[["centralityContainer"]] <- createJaspContainer()
+    jaspResults[["centralityContainer"]]$dependOn(.ln1NetGetDataDependencies())
   }
 
   if (is.null(jaspResults[["centralityTableContainer"]])) {
-    jaspResults[["centralityTableContainer"]] <- createJaspContainer(title = gettext("Centrality"))
+    jaspResults[["centralityTableContainer"]] <- createJaspContainer(title = gettext("Connection Summaries"))
+    jaspResults[["centralityTableContainer"]]$dependOn(.ln1NetGetDataDependencies())
   }
 
   if (!is.null(jaspResults[["edgelistContainer"]]) && length(jaspResults[["edgelistContainer"]]) > 0) {
@@ -166,12 +171,9 @@ It is important to recognize that PECAN represents perceived causality, not nece
       edgelistOptions <- options[["connectionList"]][[i]]
       edgelistName <- edgelistOptions[["name"]]
       if (is.null(jaspResults[["centralityContainer"]][[edgelistName]])) {
-        useAllConnections <- isTRUE(edgelistOptions[["allConnections"]])
-        if (useAllConnections || .ln1NetCheckEdgelist(edgelistOptions, .ln1NetNodeNames(options))) {
+        if (.ln1NetEdgelistReady(edgelistOptions, .ln1NetNodeNames(options))) {
           edgelist <- jaspResults[["edgelistContainer"]][[edgelistName]]$object
-          usedNodes <- unique(c(edgelist[["from"]], edgelist[["to"]]))
           nodeAttrs <- jaspResults[["nodeAttributesState"]]$object
-          nodeAttrs <- nodeAttrs[nodeAttrs[["name"]] %in% usedNodes, , drop = FALSE]
           centralityState <- createJaspState(
             .ln1NetCentralitySingle(
               edgelist,
@@ -179,28 +181,16 @@ It is important to recognize that PECAN represents perceived causality, not nece
               options
             )
           )
-          centralityState$dependOn(
-            nestedOptions = list(
-              c("connectionList", i, "connections"),
-              c("connectionList", i, "allConnections"),
-              c("connectionList", i, "allConnectionStrengths"),
-              c("connectionList", i, "centrality")
-            )
-          )
           jaspResults[["centralityContainer"]][[edgelistName]] <- centralityState
         }
       }
 
-      if (edgelistOptions[["centrality"]] && is.null(jaspResults[["centralityTableContainer"]][[edgelistName]]) && 
+      if (isTRUE(edgelistOptions[["centrality"]]) && is.null(jaspResults[["centralityTableContainer"]][[edgelistName]]) &&
         !is.null(jaspResults[["centralityContainer"]][[edgelistName]])) {
         centralityTable <- createJaspTable(edgelistName)
-        centralityTable$dependOn(
-          nestedOptions = list(
-            c("connectionList", i, "name"),
-            c("connectionList", i, "connections"),
-            c("connectionList", i, "centrality")
-          )
-        )
+        edges <- jaspResults[["edgelistContainer"]][[edgelistName]]$object
+        if (any(!.ln1NetNodeNames(options) %in% c(edges[["from"]], edges[["to"]])))
+          centralityTable$addFootnote(gettext("Problems without entered connections have zero incoming and outgoing values. This does not establish the absence of real-world influence."))
         jaspResults[["centralityTableContainer"]][[edgelistName]] <- .ln1NetFillCentralityTable(
           centralityTable,
           jaspResults[["centralityContainer"]][[edgelistName]]$object,
@@ -212,27 +202,36 @@ It is important to recognize that PECAN represents perceived causality, not nece
 }
 
 .ln1NetCentralitySingle <- function(edgelist, nodeAttributes, options) {
+  # Keep the existing degreeIn/degreeOut IDs for saved output compatibility.
+  # These are signed sums, not counts; the displayed labels state that explicitly.
   centrality <- tidygraph::tbl_graph(nodes=nodeAttributes, edges=edgelist, directed = TRUE) |>
     tidygraph::activate(nodes) |>
     dplyr::mutate(
+      severity = strength,
+      strengthIn = tidygraph::centrality_degree(weights = abs(weight), mode = "in"),
+      strengthOut = tidygraph::centrality_degree(weights = abs(weight), mode = "out"),
       degreeIn = tidygraph::centrality_degree(weights = weight, mode = "in"),
       degreeOut = tidygraph::centrality_degree(weights = weight, mode = "out")
     ) |>
     as.data.frame()
-  
-  return(centrality[, c("name", "degreeIn", "degreeOut")])
+
+  return(centrality[, c("name", "severity", "strengthOut", "degreeOut", "strengthIn", "degreeIn")])
 }
 
 .ln1NetFillCentralityTable <- function(table, centrality, options) {
-  degreeOvertitle <- gettext("Degree")
-
   table$addColumnInfo(name = "name", title = gettext("Problem"), type = "string")
-  table$addColumnInfo(name = "degreeIn", title = gettext("In"), type = "number", overtitle = degreeOvertitle)
-  table$addColumnInfo(name = "degreeOut", title = gettext("Out"), type = "number", overtitle = degreeOvertitle)
+  table$addColumnInfo(name = "severity", title = gettext("Severity"), type = "number")
+  table$addColumnInfo(name = "strengthOut", title = gettext("Absolute strength"), type = "number", overtitle = gettext("Outgoing"))
+  table$addColumnInfo(name = "degreeOut", title = gettext("Signed sum"), type = "number", overtitle = gettext("Outgoing"))
+  table$addColumnInfo(name = "strengthIn", title = gettext("Absolute strength"), type = "number", overtitle = gettext("Incoming"))
+  table$addColumnInfo(name = "degreeIn", title = gettext("Signed sum"), type = "number", overtitle = gettext("Incoming"))
 
-  table[["name"]] <- centrality[["name"]]
-  table[["degreeIn"]] <- centrality[["degreeIn"]]
-  table[["degreeOut"]] <- centrality[["degreeOut"]]
+  for (column in names(centrality))
+    table[[column]] <- centrality[[column]]
+
+  table$addFootnote(gettext("Outgoing summarizes connections from a problem; incoming summarizes connections to it. Absolute strength sums the absolute ratings. Signed sum adds the ratings with their signs."))
+  table$addFootnote(gettext("Ratings of +0.7 and -0.7 give an absolute strength of 1.4 and a signed sum of 0. A zero signed sum can reflect cancellation, even when connections are present."))
+  table$addFootnote(gettext("Severity ranges from 0 to 1, is shared across time points, and does not weight these sums. These summaries describe perceived connections, not predicted treatment benefit or treatment priorities."))
 
   return(table)
 }
@@ -240,6 +239,7 @@ It is important to recognize that PECAN represents perceived causality, not nece
 .ln1NetEdgeWeightTables <- function(jaspResults, options) {
   if (is.null(jaspResults[["edgeWeightTableContainer"]])) {
     jaspResults[["edgeWeightTableContainer"]] <- createJaspContainer(title = gettext("Edge Weights"))
+    jaspResults[["edgeWeightTableContainer"]]$dependOn(.ln1NetGetDataDependencies())
   }
 
   if (!is.null(jaspResults[["edgelistContainer"]]) && length(jaspResults[["edgelistContainer"]]) > 0) {
@@ -247,20 +247,10 @@ It is important to recognize that PECAN represents perceived causality, not nece
     for (i in seq_along(options[["connectionList"]])) {
       edgelistOptions <- options[["connectionList"]][[i]]
       edgelistName <- edgelistOptions[["name"]]
-      if (edgelistOptions[["edgeWeightTable"]] && is.null(jaspResults[["edgeWeightTableContainer"]][[edgelistName]])) {
-        useAllConnections <- isTRUE(edgelistOptions[["allConnections"]])
-        if (useAllConnections || .ln1NetCheckEdgelist(edgelistOptions, nodeNames)) {
+      if (isTRUE(edgelistOptions[["edgeWeightTable"]]) && is.null(jaspResults[["edgeWeightTableContainer"]][[edgelistName]])) {
+        if (.ln1NetEdgelistReady(edgelistOptions, nodeNames)) {
           edgelist <- jaspResults[["edgelistContainer"]][[edgelistName]]$object
           edgeTable <- createJaspTable(edgelistName)
-          edgeTable$dependOn(
-            nestedOptions = list(
-              c("connectionList", i, "name"),
-              c("connectionList", i, "connections"),
-              c("connectionList", i, "allConnections"),
-              c("connectionList", i, "allConnectionStrengths"),
-              c("connectionList", i, "edgeWeightTable")
-            )
-          )
           edgeTable$addColumnInfo(name = "from",   title = gettext("From"),   type = "string")
           edgeTable$addColumnInfo(name = "to",     title = gettext("To"),     type = "string")
           edgeTable$addColumnInfo(name = "weight", title = gettext("Weight"), type = "number")
@@ -268,6 +258,8 @@ It is important to recognize that PECAN represents perceived causality, not nece
           edgeTable[["from"]]   <- edgelist[["from"]]
           edgeTable[["to"]]     <- edgelist[["to"]]
           edgeTable[["weight"]] <- edgelist[["weight"]]
+          if (nrow(edgelist) == 0L)
+            edgeTable$addFootnote(gettext("No connections have been entered for this time point. All selected problems remain in the network."))
 
           jaspResults[["edgeWeightTableContainer"]][[edgelistName]] <- edgeTable
         }
@@ -279,13 +271,14 @@ It is important to recognize that PECAN represents perceived causality, not nece
 .ln1NetCreateNetworkPlots <- function(jaspResults, dataset, options, dependencyFun) {
   if(is.null(jaspResults[["networkPlotContainer"]])) {
     jaspResults[["networkPlotContainer"]] <- createJaspContainer(title = gettext("Network Plots"))
+    jaspResults[["networkPlotContainer"]]$dependOn(dependencyFun())
   }
 
-  if (!is.null(jaspResults[["edgelistContainer"]]) && length(jaspResults[["edgelistContainer"]]) > 0) {
+  if (!is.null(jaspResults[["edgelistContainer"]])) {
     nodeNames <- .ln1NetNodeNames(options)
     for (i in seq_along(options[["connectionList"]])) {
       edgelistOptions <- options[["connectionList"]][[i]]
-      if (edgelistOptions[["plotNetwork"]]) {
+      if (isTRUE(edgelistOptions[["plotNetwork"]])) {
         edgelistName <- edgelistOptions[["name"]]
         useAllConnections <- isTRUE(edgelistOptions[["allConnections"]])
         dataPlot <- createJaspPlot(
@@ -298,17 +291,10 @@ It is important to recognize that PECAN represents perceived causality, not nece
           options = c(
             "plotLayout", "colorPalette", "plotSeverityFill", "plotSeveritySize", "plotSeverityAlpha", 
             "plotStrengthColor", "plotStrengthWidth", "plotStrengthAlpha"
-          ),
-          nestedOptions = list(
-            c("connectionList", i, "name"),
-            c("connectionList", i, "connections"),
-            c("connectionList", i, "allConnections"),
-            c("connectionList", i, "allConnectionStrengths"),
-            c("connectionList", i, "plotNetwork")
           )
         )
 
-        edgelistReady <- useAllConnections || .ln1NetCheckEdgelist(edgelistOptions, nodeNames)
+        edgelistReady <- .ln1NetEdgelistReady(edgelistOptions, nodeNames)
         selfLoops <- if (useAllConnections) character(0) else .ln1NetFindSelfLoops(edgelistOptions)
 
         if (length(selfLoops) > 0) {
@@ -318,14 +304,16 @@ It is important to recognize that PECAN represents perceived causality, not nece
           ))
         } else if (edgelistReady) {
           edgelist <- jaspResults[["edgelistContainer"]][[edgelistName]]$object
-          usedNodes <- unique(c(edgelist[["from"]], edgelist[["to"]]))
           nodeAttrs <- jaspResults[["nodeAttributesState"]]$object
-          nodeAttrs <- nodeAttrs[nodeAttrs[["name"]] %in% usedNodes, , drop = FALSE]
           dataPlot$plotObject <- .ln1NetCreateNetworkPlotFill(
             edgelist,
             nodeAttrs,
             options
           )
+        } else if (useAllConnections) {
+          dataPlot$setError(gettext("Complete the connection strengths for all selected problems."))
+        } else {
+          dataPlot$setError(gettext("Complete each connection with two different selected problems and a strength, or remove the unfinished row. To show a network without connections, remove all connection rows."))
         }
 
         jaspResults[["networkPlotContainer"]][[edgelistName]] <- dataPlot
@@ -335,6 +323,9 @@ It is important to recognize that PECAN represents perceived causality, not nece
 }
 
 .ln1NetCreateNetworkPlotFill <- function(edgelist, nodeAttributes, options) {
+  # Zero is an entered rating of no perceived relationship. Keep the raw rating
+  # in tables and exports, but exclude it from the plotted topology and arrows.
+  edgelist <- edgelist[edgelist[["weight"]] != 0, , drop = FALSE]
   gr <- tidygraph::tbl_graph(nodes=nodeAttributes, edges=edgelist, directed = TRUE)
 
   p <- ggraph::ggraph(
@@ -454,55 +445,12 @@ It is important to recognize that PECAN represents perceived causality, not nece
 
   for (i in seq_along(options[["connectionList"]])) {
     edgelistOptions <- options[["connectionList"]][[i]]
-    if (isTRUE(edgelistOptions[["allConnections"]]) || .ln1NetCheckEdgelist(edgelistOptions, .ln1NetNodeNames(options))) {
+    if (.ln1NetEdgelistReady(edgelistOptions, .ln1NetNodeNames(options))) {
       edgelistName <- edgelistOptions[["name"]]
       edgelistList[[edgelistName]] <- edgelistContainer[[edgelistName]]$object
-      edgelistList[[edgelistName]][["name"]] <- edgelistName
+      edgelistList[[edgelistName]][["name"]] <- rep(edgelistName, nrow(edgelistList[[edgelistName]]))
     }
   }
 
   return(Reduce(rbind, edgelistList))
-}
-
-.ln1NetSaveNetwork <- function(jaspResults, options) {
-  if (is.null(jaspResults[["networkSavePath"]])) {
-    networkSavePath <- createJaspState()
-    networkSavePath$dependOn(c("problems", "connectionList", "networkSavePath"))
-    jaspResults[["networkSavePath"]] <- networkSavePath
-
-    if (options[["networkSavePath"]] != "") {
-      nodeAttributes <- jaspResults[["nodeAttributesState"]]$object
-      edgelistDf <- .ln1NetConcatenateEdgelists(jaspResults[["edgelistContainer"]], options)
-
-      # Build node rows: one per problem with severity, no edge info
-      nodeRows <- data.frame(
-        type     = "node",
-        time     = "",
-        name     = nodeAttributes[["name"]],
-        severity = nodeAttributes[["strength"]],
-        from     = "",
-        to       = "",
-        weight   = "",
-        stringsAsFactors = FALSE
-      )
-
-      # Build edge rows from concatenated edgelists
-      edgeRows <- NULL
-      if (!is.null(edgelistDf) && nrow(edgelistDf) > 0) {
-        edgeRows <- data.frame(
-          type     = "edge",
-          time     = edgelistDf[["name"]],
-          name     = "",
-          severity = "",
-          from     = edgelistDf[["from"]],
-          to       = edgelistDf[["to"]],
-          weight   = edgelistDf[["weight"]],
-          stringsAsFactors = FALSE
-        )
-      }
-
-      networkDf <- rbind(nodeRows, edgeRows)
-      utils::write.csv(networkDf, file = options[["networkSavePath"]], row.names = FALSE)
-    }
-  }
 }

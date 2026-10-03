@@ -2,38 +2,50 @@
 
 test_that("Simulated data input works", {
   options <- analysisOptions("Treatment")
+  # jaspTools does not resolve dynamic dropdown defaults.
+  options$comparisonPhase <- options$referencePhase <- ""
   options$enableIntroText <- FALSE
   options$inputType <- "simulateData"
+  options$coefficientsTable <- TRUE
+  options$autocorrelationTable <- TRUE
   options$simPhaseEffects <- list(list(simPhaseName = "pre", simPhaseEffectSimple = 0, simPhaseEffectInteraction = 0,
       simPhaseEffectN = 20), list(simPhaseName = "treat", simPhaseEffectSimple = 5,
       simPhaseEffectInteraction = 0, simPhaseEffectN = 20), list(
       simPhaseName = "post", simPhaseEffectSimple = 5, simPhaseEffectInteraction = -0.1,
       simPhaseEffectN = 20))
   set.seed(1)
-  dataset <- NULL
-  results <- runAnalysis("Treatment", dataset, options)
-
-  table <- results[["results"]][["autoCorTable"]][["data"]]
-	jaspTools::expect_equal_tables(table,
-		list(0.0656162298976082, -0.226118382049556, "AR(1)", 0.346548815538686
-			))
-
-	table <- results[["results"]][["coefTable"]][["data"]]
-	jaspTools::expect_equal_tables(table,
-		list(0.551363303786328, 4.88221430164827, 3.77679743362012, "(Intercept)",
-			 4.21992004511858e-12, 8.85480456918529, 5.98763116967642, 0.0376419437310569,
-			 -0.0627102719817359, -0.138177825335272, "time", 0.101511186874476,
-			 -1.66596795398735, 0.0127572813718004, 0.638745629273717, -4.80992001802711,
-			 -6.09052790057863, "phasepre", 5.67593959671081e-10, -7.530258991355,
-			 -3.52931213547559, 0.640802162905123, -0.140736691665649, -1.42546767590024,
-			 "phasetreat", 0.826990704437069, -0.219625806235748, 1.14399429256894,
-			 0.0532320886028335, 0.0811657736001533, -0.025558138306659,
-			 "time:phasepre", 0.133156578295302, 1.52475275215545, 0.187889685506966,
-			 0.0534916972063876, 0.081709821691388, -0.0255345741277254,
-			 "time:phasetreat", 0.132467616741153, 1.52752344679074, 0.188954217510501
-			))
+  results <- runAnalysis("Treatment", NULL, options)
+  expect_identical(results$status, "complete")
 
   plotName <- results[["results"]][["dataPlot"]][["data"]]
-	testPlot <- results[["state"]][["figures"]][[plotName]][["obj"]]
-	jaspTools::expect_equal_plots(testPlot, "data-plot")
+  testPlot <- results[["state"]][["figures"]][[plotName]][["obj"]]
+  jaspTools::expect_equal_plots(testPlot, "data-plot")
+
+  # The generated observations remain unchanged; independently estimate the
+  # single-series GLS model using phase-local mean time and continuous AR time.
+  reference <- nlme::gls(y ~ time * phase, data = testPlot$data,
+                         correlation = nlme::corAR1(form = ~ t),
+                         method = "REML", na.action = stats::na.exclude)
+  referenceTable <- summary(reference)$tTable
+  coefficientCI <- nlme::intervals(reference, level = options$coefficientCiLevel,
+                                    which = "coef")$coef
+  rows <- function(table) do.call(rbind, lapply(table$data, as.data.frame))
+  coefficients <- rows(results$results$coefTable)
+  expect_equal(coefficients$name, rownames(referenceTable))
+  expect_equal(coefficients$coef, unname(referenceTable[, "Value"]), tolerance = 1e-7)
+  expect_equal(coefficients$SE, unname(referenceTable[, "Std.Error"]), tolerance = 1e-7)
+  expect_equal(coefficients$t, unname(referenceTable[, "t-value"]), tolerance = 1e-7)
+  expect_equal(coefficients$p, unname(referenceTable[, "p-value"]), tolerance = 1e-7)
+  expect_equal(coefficients$lower, unname(coefficientCI[, "lower"]), tolerance = 1e-7)
+  expect_equal(coefficients$upper, unname(coefficientCI[, "upper"]), tolerance = 1e-7)
+
+  autocorrelation <- rows(results$results$autoCorTable)
+  correlationCI <- nlme::intervals(reference, level = options$coefficientCiLevel,
+                                    which = "var-cov")$corStruct
+  expect_equal(autocorrelation$name, "AR(1)")
+  expect_equal(autocorrelation$coef,
+               unname(stats::coef(reference$modelStruct$corStruct, unconstrained = FALSE)),
+               tolerance = 1e-7)
+  expect_equal(autocorrelation$lower, unname(correlationCI[, "lower"]), tolerance = 1e-7)
+  expect_equal(autocorrelation$upper, unname(correlationCI[, "upper"]), tolerance = 1e-7)
 })

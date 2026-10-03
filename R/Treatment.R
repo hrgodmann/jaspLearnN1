@@ -16,6 +16,7 @@
 #
 
 Treatment <- function(jaspResults, dataset = NULL, options) {
+  .ln1TreatUpgradeState(jaspResults)
   jaspResults$title <- gettext("Does The Treatment Work?")
 
   .ln1Intro(jaspResults, options, .ln1TreatIntroText)
@@ -27,11 +28,17 @@ Treatment <- function(jaspResults, dataset = NULL, options) {
   }
 
   dataset <- .ln1TreatData(jaspResults, dataset, options, ready)
+  .ln1TreatCreateTimeInfo(jaspResults, dataset, options, ready)
 
   .ln1TreatCreateDataPlot(jaspResults, dataset, options, .ln1TreatGetDataDependencies, ready)
   .ln1TreatEstimateModel(jaspResults, dataset, options, ready)
   .ln1TreatCreateAnalysisPlot(jaspResults, dataset, options, ready)
 
+  # Absent options in older saved analyses retain their existing output choice.
+  if (isTRUE(options[["phaseComparisons"]]))
+    .ln1TreatCreatePhaseComparisons(jaspResults, dataset, options, ready)
+  if (isTRUE(options[["phaseSummary"]]))
+    .ln1TreatCreatePhaseSummary(jaspResults, dataset, options, ready)
   if (options[["coefficientsTable"]])
     .ln1TreatCreateCoefficientsTable(jaspResults, options, ready)
   if (options[["autocorrelationTable"]])
@@ -45,15 +52,19 @@ Treatment <- function(jaspResults, dataset = NULL, options) {
 
 <b>How does it work?</b> 
 
-The model estimates symptom changes over time while accounting for autocorrelation, meaning that repeated measurements from the same individual are not independent (e.g., today’s symptom level is related to yesterday’s). It does this by fitting phase-specific regression lines (e.g., baseline and treatment) and modeling temporal dependencies between observations. This allows the model to separate overall trends (systematic change across time or phases) from short-term fluctuations in symptoms. To apply this method, repeated measurements of symptoms or other clinical outcomes are required across multiple time points, preferably at least 10 observations per phase. Additional predictors, such as treatment type, stress levels, or contextual factors, can also be included to explain variation over time.
+The model fits a regression line for each phase using generalized least squares (GLS) with AR(1) residual correlation and restricted maximum likelihood (REML). This accounts for the relationship between nearby measurements after allowing for the phase-specific trends. All phase comparisons come from this same fitted model.
+
+<b>Compare treatment with another phase</b>
+
+Choose the compared phase and the reference phase in Phase comparisons. Automatic selections use the second and first phases in chronological order, respectively. Differences are compared phase minus reference phase. The endpoint difference compares the fitted outcome at the end of each phase, using its last scheduled time even if that outcome is missing. It is not an immediate change at treatment onset. The slope difference compares rates of change per time unit moving forward. Phase estimates optionally show each phase's fitted endpoint and slope. Whether a lower or higher outcome represents improvement depends on the measure.
 
 <b>Practical considerations</b> 
 
-Common research questions include whether symptoms decrease more rapidly during treatment than during baseline, or whether different treatment conditions lead to different rates of improvement. A key modelling decision is how time is coded within each phase (e.g., starting at zero at the beginning or end of a phase), as this directly influences the interpretation of change estimates. The model typically assumes linear change within phases and a specific autocorrelation structure (often AR(1)).
+Common research questions include whether symptoms decrease more rapidly during treatment than during baseline, or whether different treatment conditions lead to different rates of improvement. For loaded data, select one continuous, equally spaced numeric time variable across all phases; do not restart it at each phase. Rows are sorted by time. Keep a row with its time and phase for every missing outcome. Missing outcomes are not imputed, and their time positions are preserved in the autocorrelation model. Time coding determines the interpretation of regression coefficients: loaded data use the selected time values, while simulations use time starting at 1 within each phase for regression trends. In both cases, autocorrelation follows consecutive measurement occasions across phase boundaries. The model assumes linear change within phases and an AR(1) residual correlation structure.
 
 <b>Interpretation and limitations</b> 
 
-Results should be interpreted with caution, as violations of model assumptions or insufficient numbers of observations can lead to biased or unstable estimates. In particular, small sample sizes per phase reduce reliability. Therefore, findings should be considered as one source of evidence about individual change and ideally interpreted alongside clinical judgment and other outcome measures.
+Consider endpoint and slope differences together: an improved endpoint can also reflect a trend already present before treatment. These phase-associated changes do not by themselves establish that treatment caused the improvement. Confidence intervals and tests use approximations that can be unreliable for short series or strong autocorrelation. There is no universal minimum number of observations that guarantees reliable inference. Consider the size and uncertainty of change alongside clinical judgment and other outcome measures.
 "))
 } 
 .ln1TreatData <- function(jaspResults, dataset, options, ready) {
@@ -69,17 +80,14 @@ Results should be interpreted with caution, as violations of model assumptions o
     } else {
       dataset <- jaspResults[["simulatedDataState"]]$object
     }
-  } else {
+  } else if (is.null(dataset)) {
     dataset <- .readDataSetToEnd(
       columns.as.numeric = c(options[["dependent"]], options[["time"]]),
       columns.as.factor  = options[["phase"]]
     )
   }
 
-  # Add dummy grouping variable for mixed model
-  dataset[["g"]] <- rep(1, nrow(dataset))
-
-  return(dataset)
+  return(.ln1TreatPrepareData(dataset, options))
 }
 
 .ln1TreatSimulateData <- function(options) {
@@ -151,23 +159,39 @@ Results should be interpreted with caution, as violations of model assumptions o
   return(varList)
 }
 
-.ln1TreatCreateModelFormula <- function(options) {
-  variableNames <- .ln1GetVariableNames(options)
-
-  f <- as.formula(paste(variableNames[["dependent"]], "~", variableNames[["time"]], "*", variableNames[["phase"]]))
-
-  return(f)
-}
-
 .ln1TreatEstimateModelHelper <- function(dataset, options) {
-  f <- .ln1TreatCreateModelFormula(options)
+  variables <- .ln1GetVariableNames(options)
+  timing <- attr(dataset, "ln1TreatTime")
+  # nlme internally reconstructs formulas without quoting names. Model-only
+  # columns protect both supplied names with spaces and internal-name collisions.
+  modelData <- data.frame(y = dataset[[variables[["dependent"]]]],
+                          time = dataset[[variables[["time"]]]],
+                          phase = dataset[[variables[["phase"]]]],
+                          occasion = dataset[[timing[["occasion"]]]])
+  design <- stats::model.matrix(~ time * phase, modelData[!is.na(modelData[["y"]]), , drop = FALSE])
+  if (qr(design)$rank < ncol(design))
+    .quitAnalysis(gettext("The phase-specific trends cannot be estimated reliably with this time coding. Express time relative to the start of the series, keeping one continuous clock across phases."))
 
-  mod <- nlme::lme(
-    fixed = f,
-    data=dataset,
-    random = ~ 1 | g,
-    correlation = nlme::corAR1()
+  # One individual has a fixed intercept and correlated residuals. There is
+  # no between-series random-intercept variance to estimate from this series.
+  mod <- nlme::gls(
+    model = y ~ time * phase,
+    data = modelData,
+    correlation = nlme::corAR1(form = ~ occasion),
+    method = "REML",
+    na.action = stats::na.exclude
   )
+  # Build labels from the fitted design; never evaluate decoded user names as
+  # formula syntax (a column named '.' would otherwise expand other terms).
+  term <- attr(design, "assign")
+  labels <- colnames(design)
+  timeLabel <- decodeColNames(variables[["time"]])
+  phaseLabel <- decodeColNames(variables[["phase"]])
+  labels[term == 1L] <- timeLabel
+  labels[term == 2L] <- paste0(phaseLabel, substring(labels[term == 2L], nchar("phase") + 1L))
+  labels[term == 3L] <- paste0(timeLabel, ":", phaseLabel,
+    substring(labels[term == 3L], nchar("time:phase") + 1L))
+  attr(mod, "ln1TreatCoefficientNames") <- labels
 
   return(mod)
 }
@@ -183,7 +207,7 @@ Results should be interpreted with caution, as violations of model assumptions o
 
 .ln1TreatCreateCoefficientsTable <- function(jaspResults, options, ready) {
   if (is.null(jaspResults[["coefTable"]])) {
-    table <- createJaspTable(gettext("Coefficients"))
+    table <- createJaspTable(gettext("Coefficients"), position = 7)
     table$dependOn(c(.ln1TreatGetDataDependencies(), "coefficientCiLevel", "coefficientsTable"))
 
     table$addColumnInfo(name = "name",         title = "",                        type = "string")
@@ -197,9 +221,10 @@ Results should be interpreted with caution, as violations of model assumptions o
     table$addColumnInfo(name = "lower", title = gettext("Lower"), type = "number", overtitle = overtitle)
     table$addColumnInfo(name = "upper", title = gettext("Upper"), type = "number", overtitle = overtitle)
 
-    table$addFootnote(gettext("Results are based on a linear mixed-effects model with an AR(1) correlation structure. The model tests whether the level and trend of the dependent variable changed across treatment phases."))
+    table$addFootnote(gettext("Results are based on generalized least squares regression with AR(1) residual correlation, estimated using restricted maximum likelihood (REML). Coefficients describe phase-specific levels and trends for this individual."))
 
     if (!is.null(jaspResults[["modelState"]]) && ready) {
+      .ln1TreatCoefficientContext(table, jaspResults[["modelState"]]$object, options)
       .ln1TreatFillCoefficientsTable(table, jaspResults[["modelState"]]$object, options)
     }
 
@@ -211,15 +236,15 @@ Results should be interpreted with caution, as violations of model assumptions o
   modelSummary <- summary(modelObject)
   modelCoefficients <- data.frame(coef(modelSummary))
 
-  table[["name"]] <- row.names(modelCoefficients)
+  table[["name"]] <- attr(modelObject, "ln1TreatCoefficientNames")
   table[["coef"]] <- modelCoefficients[["Value"]]
   table[["SE"]] <- modelCoefficients[["Std.Error"]]
   table[["t"]] <- modelCoefficients[["t.value"]]
   table[["p"]] <- modelCoefficients[["p.value"]]
 
-  ci <- nlme::intervals(modelObject, level = options[["coefficientCiLevel"]], which = "fixed")
+  ci <- nlme::intervals(modelObject, level = options[["coefficientCiLevel"]], which = "coef")
 
-  ciFixed <- data.frame(ci[["fixed"]])
+  ciFixed <- data.frame(ci[["coef"]])
 
   table[["lower"]] <- ciFixed[["lower"]]
   table[["upper"]] <- ciFixed[["upper"]]
@@ -227,7 +252,7 @@ Results should be interpreted with caution, as violations of model assumptions o
 
 .ln1TreatCreateAutoCorTable <- function(jaspResults, options, ready) {
   if (is.null(jaspResults[["autoCorTable"]])) {
-    table <- createJaspTable(gettext("Autocorrelation"))
+    table <- createJaspTable(gettext("Autocorrelation"), position = 8)
     table$dependOn(c(.ln1TreatGetDataDependencies(), "coefficientCiLevel", "autocorrelationTable"))
 
     table$addColumnInfo(name = "name",         title = "",                        type = "string")
@@ -238,7 +263,7 @@ Results should be interpreted with caution, as violations of model assumptions o
     table$addColumnInfo(name = "lower", title = gettext("Lower"), type = "number", overtitle = overtitle)
     table$addColumnInfo(name = "upper", title = gettext("Upper"), type = "number", overtitle = overtitle)
 
-    table$addFootnote(gettext("The AR(1) coefficient reflects the first-order autocorrelation of the residuals, indicating how strongly each observation depends on the previous one."))
+    table$addFootnote(gettext("The AR(1) coefficient is the residual correlation over one measurement interval. Across k intervals, the model uses this coefficient raised to the power k. Missing outcomes preserve their time positions; autocorrelation continues across phase boundaries."))
 
     if (!is.null(jaspResults[["modelState"]]) && ready) {
       .ln1TreatFillAutoCorTable(table, jaspResults[["modelState"]]$object, options)
@@ -256,15 +281,15 @@ Results should be interpreted with caution, as violations of model assumptions o
   phi <- as.numeric(coef(corStruct, unconstrained = FALSE))
   table[["coef"]] <- phi
 
-  # CIs may fail when the estimate is near the boundary
-  ci <- try(nlme::intervals(modelObject, level = options[["coefficientCiLevel"]], which = "all"))
+  # Variance-component intervals can be unavailable even away from a boundary.
+  ci <- try(nlme::intervals(modelObject, level = options[["coefficientCiLevel"]], which = "var-cov"), silent = TRUE)
 
   if (!jaspBase::isTryError(ci) && !is.null(ci[["corStruct"]])) {
     ciAutoCor <- data.frame(ci[["corStruct"]])
     table[["lower"]] <- ciAutoCor[["lower"]]
     table[["upper"]] <- ciAutoCor[["upper"]]
   } else {
-    table$addFootnote(gettext("Confidence intervals for the autocorrelation could not be computed. The point estimate may be near the boundary of the parameter space."))
+    table$addFootnote(gettext("The confidence interval for the autocorrelation could not be estimated reliably for this fitted model."))
   }
 }
 
@@ -274,7 +299,7 @@ Results should be interpreted with caution, as violations of model assumptions o
       title = gettext("Data plot"),
       height = 480,
       width = 480,
-      position = 2
+      position = 3
     )
     dataPlot$dependOn(c("plotData", dependencyFun()))
     if (ready) {
@@ -291,7 +316,7 @@ Results should be interpreted with caution, as violations of model assumptions o
   xName <- variableNames[["t"]]
 
   xBreaks <- jaspGraphs::getPrettyAxisBreaks(dataset[[xName]])
-  yBreaks <- jaspGraphs::getPrettyAxisBreaks(dataset[[yName]])
+  yBreaks <- jaspGraphs::getPrettyAxisBreaks(dataset[[yName]][!is.na(dataset[[yName]])])
 
   p <- ggplot2::ggplot(
       dataset,
@@ -301,14 +326,14 @@ Results should be interpreted with caution, as violations of model assumptions o
         color = .data[[variableNames[["phase"]]]]
       )
     ) +
-    jaspGraphs::geom_line() +
-    jaspGraphs::geom_point() +
+    jaspGraphs::geom_line(na.rm = TRUE) +
+    jaspGraphs::geom_point(na.rm = TRUE) +
     ggplot2::scale_x_continuous(
-      name = if (options[["inputType"]] == "loadData") xName else gettext("Time"),
+      name = if (options[["inputType"]] == "loadData") decodeColNames(xName) else gettext("Time"),
       breaks = xBreaks,
       limits = range(xBreaks)
     ) +
-    ggplot2::scale_y_continuous(breaks = yBreaks, limits = range(yBreaks)) +
+    ggplot2::scale_y_continuous(name = decodeColNames(yName), breaks = yBreaks, limits = range(yBreaks)) +
     jaspGraphs::geom_rangeframe() +
     jaspGraphs::themeJaspRaw()
 
@@ -321,7 +346,7 @@ Results should be interpreted with caution, as violations of model assumptions o
       title = gettext("Analysis plot"),
       height = 480,
       width = 480,
-      position = 3
+      position = 4
     )
     analysisPlot$dependOn(c("plotAnalysis", .ln1TreatGetDataDependencies()))
     if (ready && !is.null(jaspResults[["modelState"]])) {
@@ -338,10 +363,12 @@ Results should be interpreted with caution, as violations of model assumptions o
   xName <- variableNames[["t"]]
   phaseName <- variableNames[["phase"]]
 
-  dataset[["fitted"]] <- as.numeric(fitted(modelObject))
+  fittedName <- .ln1TreatInternalName(dataset, ".ln1TreatFitted")
+  dataset[[fittedName]] <- as.numeric(stats::fitted(modelObject))
 
   xBreaks <- jaspGraphs::getPrettyAxisBreaks(dataset[[xName]])
-  yBreaks <- jaspGraphs::getPrettyAxisBreaks(c(dataset[[yName]], dataset[["fitted"]]))
+  yValues <- c(dataset[[yName]], dataset[[fittedName]])
+  yBreaks <- jaspGraphs::getPrettyAxisBreaks(yValues[!is.na(yValues)])
 
   p <- ggplot2::ggplot(
       dataset,
@@ -351,19 +378,23 @@ Results should be interpreted with caution, as violations of model assumptions o
         color = .data[[phaseName]]
       )
     ) +
-    jaspGraphs::geom_point(alpha = 0.4) +
+    jaspGraphs::geom_point(alpha = 0.4, na.rm = TRUE) +
     ggplot2::geom_line(
-      mapping = ggplot2::aes(y = .data[["fitted"]]),
-      linewidth = 1.2
+      mapping = ggplot2::aes(y = .data[[fittedName]]),
+      linewidth = 1.2,
+      na.rm = TRUE
     ) +
     ggplot2::scale_x_continuous(
-      name = if (options[["inputType"]] == "loadData") xName else gettext("Time"),
+      name = if (options[["inputType"]] == "loadData") decodeColNames(xName) else gettext("Time"),
       breaks = xBreaks,
       limits = range(xBreaks)
     ) +
-    ggplot2::scale_y_continuous(breaks = yBreaks, limits = range(yBreaks)) +
+    ggplot2::scale_y_continuous(name = decodeColNames(yName), breaks = yBreaks, limits = range(yBreaks)) +
     jaspGraphs::geom_rangeframe() +
-    jaspGraphs::themeJaspRaw()
+    jaspGraphs::themeJaspRaw() +
+    ggplot2::labs(color = gettext("Phase")) +
+    ggplot2::guides(color = ggplot2::guide_legend(ncol = 1)) +
+    ggplot2::theme(legend.position = "bottom")
 
   return(p)
 }

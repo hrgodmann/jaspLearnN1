@@ -29,7 +29,7 @@ The organization of the analyses within the Learn N=1 module in JASP is as follo
 
 **How Do Symptoms Develop?** Models the temporal dynamics of symptoms using ARIMA models. Automatically selects the best-fitting ARIMA specification via `forecast::auto.arima` and supports forecasting future symptom trajectories with configurable forecast horizons and visualization options.
 
-**How Are Symptoms Connected?** Constructs directed symptom networks where nodes represent problems and edges represent their temporal connections. Computes in-degree and out-degree centrality to identify the most influential symptoms, with customizable network visualizations across multiple time points.
+**How Are Symptoms Connected?** Visualizes perceived causal networks in which nodes represent selected problems and directed edges represent rated relationships. Connection summaries show severity separately from incoming and outgoing absolute strengths and signed sums, with explicit explanations of cancellation. These descriptive summaries support case formulation rather than determine treatment priorities. Networks can be recorded at multiple assessment occasions.
 
 ## Maintainer
 
