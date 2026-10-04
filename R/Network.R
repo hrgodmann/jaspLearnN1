@@ -18,17 +18,22 @@
 Network <- function(jaspResults, dataset = NULL, options) {
   jaspResults$title <- gettext("How Are Symptoms Connected?")
 
-  .ln1NetUpgradeState(jaspResults)
+  tryCatch({
+    .ln1NetUpgradeState(jaspResults)
+    .ln1NetPresetFiles(jaspResults, options)
+    .ln1NetValidateOptions(options)
 
-  .ln1Intro(jaspResults, options, .ln1NetIntroText)
-
-  .ln1NetData(jaspResults, dataset, options)
-
-  .ln1NetCreateNetworkPlots(jaspResults, dataset, options, .ln1NetGetDataDependencies)
-
-  .ln1NetCentrality(jaspResults, options)
-
-  .ln1NetEdgeWeightTables(jaspResults, options)
+    .ln1Intro(jaspResults, options, .ln1NetIntroText)
+    .ln1NetData(jaspResults, dataset, options)
+    .ln1NetCreateNetworkPlots(jaspResults, dataset, options, .ln1NetGetDataDependencies)
+    .ln1NetCentrality(jaspResults, options)
+    .ln1NetEdgeWeightTables(jaspResults, options)
+  }, error = function(error) {
+    # A click blocked by invalid inputs or another analysis error must not be
+    # replayed as an automatic file write when the user repairs the problem.
+    .ln1NetConsumeBlockedExportRequest(jaspResults, options)
+    stop(error)
+  })
 
   .ln1NetSaveNetwork(jaspResults, options)
 }
@@ -53,15 +58,16 @@ It is important to recognize that PECAN represents perceived causality, not nece
 
 
 .ln1NetGetDataDependencies <- function() {
-  return(c("problems", "connectionList"))
+  return(c("problems", "connectionList", "networkSeverityMaximum",
+           "networkConnectionMaximum", "networkConnectionCounts"))
 }
 
 .ln1NetData <- function(jaspResults, dataset, options) {
-  nodeAttributes <- data.frame(t(sapply(options[["problems"]], function(problem) {
-    return(c(problem[["problemName"]], problem[["problemSeverity"]]))
-  })))
-  names(nodeAttributes) <- c("name", "strength")
-  nodeAttributes[["strength"]] <- as.numeric(nodeAttributes[["strength"]])
+  nodeAttributes <- data.frame(
+    name = vapply(options[["problems"]], `[[`, character(1), "problemName"),
+    strength = vapply(options[["problems"]], .ln1NetSeverityValue, numeric(1)),
+    stringsAsFactors = FALSE
+  )
 
   jaspResults[["nodeAttributesState"]] <- createJaspState(nodeAttributes)
 
@@ -215,23 +221,39 @@ It is important to recognize that PECAN represents perceived causality, not nece
     ) |>
     as.data.frame()
 
-  return(centrality[, c("name", "severity", "strengthOut", "degreeOut", "strengthIn", "degreeIn")])
+  centrality <- centrality[, c("name", "severity", "strengthOut", "degreeOut", "strengthIn", "degreeIn")]
+  if (isTRUE(options[["networkConnectionCounts"]])) {
+    counts <- .ln1NetConnectionCounts(edgelist, nodeAttributes)
+    centrality[["countOut"]] <- counts[["countOut"]]
+    centrality[["countIn"]] <- counts[["countIn"]]
+  }
+  return(centrality)
 }
 
 .ln1NetFillCentralityTable <- function(table, centrality, options) {
+  severityMaximum <- .ln1NetScaleMaximum(options, "networkSeverityMaximum")
+  connectionMaximum <- .ln1NetScaleMaximum(options, "networkConnectionMaximum")
+  centrality[["severity"]] <- centrality[["severity"]] * severityMaximum
+  for (column in c("strengthOut", "degreeOut", "strengthIn", "degreeIn"))
+    centrality[[column]] <- centrality[[column]] * connectionMaximum
   table$addColumnInfo(name = "name", title = gettext("Problem"), type = "string")
   table$addColumnInfo(name = "severity", title = gettext("Severity"), type = "number")
   table$addColumnInfo(name = "strengthOut", title = gettext("Absolute strength"), type = "number", overtitle = gettext("Outgoing"))
   table$addColumnInfo(name = "degreeOut", title = gettext("Signed sum"), type = "number", overtitle = gettext("Outgoing"))
   table$addColumnInfo(name = "strengthIn", title = gettext("Absolute strength"), type = "number", overtitle = gettext("Incoming"))
   table$addColumnInfo(name = "degreeIn", title = gettext("Signed sum"), type = "number", overtitle = gettext("Incoming"))
+  if (isTRUE(options[["networkConnectionCounts"]])) {
+    table$addColumnInfo(name = "countOut", title = gettext("Outgoing connections"), type = "integer")
+    table$addColumnInfo(name = "countIn", title = gettext("Incoming connections"), type = "integer")
+    table$addFootnote(gettext("Connection counts include distinct nonzero directed connections. Zero-rated connections do not count."))
+  }
 
   for (column in names(centrality))
     table[[column]] <- centrality[[column]]
 
   table$addFootnote(gettext("Outgoing summarizes connections from a problem; incoming summarizes connections to it. Absolute strength sums the absolute ratings. Signed sum adds the ratings with their signs."))
-  table$addFootnote(gettext("Ratings of +0.7 and -0.7 give an absolute strength of 1.4 and a signed sum of 0. A zero signed sum can reflect cancellation, even when connections are present."))
-  table$addFootnote(gettext("Severity ranges from 0 to 1, is shared across time points, and does not weight these sums. These summaries describe perceived connections, not predicted treatment benefit or treatment priorities."))
+  table$addFootnote(gettext("A zero signed sum can reflect cancellation of increasing and decreasing connections, even when connections are present."))
+  table$addFootnote(gettextf("Severity ranges from 0 to %1$g and is shared across assessments. Unrated severity is left blank. Connection ratings range from -%2$g to %2$g; their sums may exceed these limits. Severity does not weight the sums. These summaries describe perceived connections, not predicted treatment benefit or treatment priorities.", severityMaximum, connectionMaximum))
 
   return(table)
 }
@@ -257,7 +279,9 @@ It is important to recognize that PECAN represents perceived causality, not nece
 
           edgeTable[["from"]]   <- edgelist[["from"]]
           edgeTable[["to"]]     <- edgelist[["to"]]
-          edgeTable[["weight"]] <- edgelist[["weight"]]
+          maximum <- .ln1NetScaleMaximum(options, "networkConnectionMaximum")
+          edgeTable[["weight"]] <- edgelist[["weight"]] * maximum
+          edgeTable$addFootnote(gettextf("Signed connection ratings use the displayed scale from -%1$g to %1$g. Zero means no perceived relationship.", maximum))
           if (nrow(edgelist) == 0L)
             edgeTable$addFootnote(gettext("No connections have been entered for this time point. All selected problems remain in the network."))
 
@@ -326,6 +350,13 @@ It is important to recognize that PECAN represents perceived causality, not nece
   # Zero is an entered rating of no perceived relationship. Keep the raw rating
   # in tables and exports, but exclude it from the plotted topology and arrows.
   edgelist <- edgelist[edgelist[["weight"]] != 0, , drop = FALSE]
+  unrated <- is.na(nodeAttributes[["strength"]])
+  nodeAttributes[["severityUnrated"]] <- unrated
+  nodeAttributes[["plotLabel"]] <- nodeAttributes[["name"]]
+  nodeAttributes[["plotLabel"]][unrated] <- gettextf("%1$s (not rated)", nodeAttributes[["name"]][unrated])
+  # Retain every node. The neutral overlay below distinguishes unrated severity
+  # from a recorded zero without supplying an invented severity estimate.
+  nodeAttributes[["strength"]][unrated] <- 0
   gr <- tidygraph::tbl_graph(nodes=nodeAttributes, edges=edgelist, directed = TRUE)
 
   p <- ggraph::ggraph(
@@ -339,7 +370,7 @@ It is important to recognize that PECAN represents perceived causality, not nece
   absWeightQuosure <- "absWeight"
 
   nodeArgs <- list()
-  textArgs <- list(label = "name")
+  textArgs <- list(label = "plotLabel")
   edgeArgs <- list()
 
   if (options[["plotSeverityFill"]]) {
@@ -398,6 +429,11 @@ It is important to recognize that PECAN represents perceived causality, not nece
     nodeStaticArgs[["size"]] <- 12
   }
   p <- p + do.call(ggraph::geom_node_point, nodeStaticArgs)
+  if (any(unrated))
+    p <- p + ggraph::geom_node_point(
+      data = function(data) data[data[["severityUnrated"]], , drop = FALSE],
+      shape = 21, fill = "#B3BAC5", color = "grey30", size = 12,
+      alpha = 1, stroke = 0.8, show.legend = FALSE)
 
   # Labels: repelled away from nodes and edges
   p <- p +
@@ -424,7 +460,8 @@ It is important to recognize that PECAN represents perceived causality, not nece
       name = gettext("Severity"),
       palette = options[["colorPalette"]],
       limits = c(0, 1),
-      breaks = seq(0, 1, 0.5)
+      breaks = seq(0, 1, 0.5),
+      labels = seq(0, 1, 0.5) * .ln1NetScaleMaximum(options, "networkSeverityMaximum")
     ) +
     ggraph::scale_edge_width_continuous(limits = c(0, 1), range = c(0.3, 1.5), guide = "none") +
     ggraph::scale_edge_alpha_continuous(limits = c(0, 1), range = c(0, 1), guide = "none") +

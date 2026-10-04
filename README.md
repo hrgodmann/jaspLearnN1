@@ -31,6 +31,8 @@ The organization of the analyses within the Learn N=1 module in JASP is as follo
 
 **How Are Symptoms Connected?** Visualizes perceived causal networks in which nodes represent selected problems and directed edges represent rated relationships. Connection summaries show severity separately from incoming and outgoing absolute strengths and signed sums, with explicit explanations of cancellation. These descriptive summaries support case formulation rather than determine treatment priorities. Networks can be recorded at multiple assessment occasions.
 
+Network ratings support configurable display scales, numeric entry, midpoint markers and optional incoming/outgoing connection counts. Editable starting lists and JSON presets reuse problem definitions without patient ratings. New severity values remain explicitly unrated until confirmed. Each assessment can be cleared separately, and CSV/preset files are written only by their save buttons. See the [Network help](inst/help/Network.md) for scale interpretation, preset replacement and export details.
+
 ## Maintainer
 
 - Henrik Godmann

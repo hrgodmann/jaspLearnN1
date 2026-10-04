@@ -211,7 +211,8 @@ test_that("network CSV preserves every node and explicitly records empty occasio
     expect_true(file.exists(options$networkSavePath))
     exported <- utils::read.csv(options$networkSavePath, stringsAsFactors = FALSE,
                                 na.strings = character(), colClasses = "character")
-    expect_equal(names(exported), c("type", "time", "name", "severity", "from", "to", "weight"))
+    expect_equal(names(exported), c("type", "time", "name", "severity", "from", "to", "weight",
+                                     "schemaVersion", "severityMaximum", "connectionMaximum", "severityRated"))
     nodes <- exported[exported$type == "node", , drop = FALSE]
     expect_equal(nodes$name, c("A", "B", "C"))
     expect_equal(as.numeric(nodes$severity), c(.8, .2, .5))
@@ -316,7 +317,7 @@ test_that("legacy network caches are rebuilt with previously hidden isolated nod
   expect_true(recorded$called)
   expect_true(all(recorded$cleared))
   expect_true(recorded$exportPreserved)
-  expect_identical(recorded$version, 3L)
+  expect_identical(recorded$version, 4L)
   expect_true(recorded$idempotent)
   expect_identical(result$status, "complete")
   graph <- .netNodesExpectPlot(result, options)
@@ -330,11 +331,11 @@ test_that("legacy network caches are rebuilt with previously hidden isolated nod
   expect_identical(readLines(options$networkSavePath), savedContents)
 })
 
-test_that("version-two plot caches rebuild without rewriting unchanged exports", {
+test_that("version-two caches rebuild for scales without rewriting existing exports", {
   options <- .netNodesOptions(connections = list(.netNodesEdge(strength = 0)))
   options$networkSavePath <- tempfile(fileext = ".csv")
   on.exit(unlink(options$networkSavePath), add = TRUE)
-  savedContents <- "existing export must not be rewritten by a plot-only upgrade"
+  savedContents <- "existing export must not be rewritten by a result upgrade"
   writeLines(savedContents, options$networkSavePath)
   originalUpgrade <- .netNodesFunction(".ln1NetUpgradeState")
   recorded <- new.env(parent = emptyenv())
@@ -362,15 +363,17 @@ test_that("version-two plot caches rebuild without rewriting unchanged exports",
       !is.null(jaspResults[[key]]), logical(1))
     recorded$savedState <- jaspResults[["networkSavePath"]]$object
     recorded$version <- jaspResults[["networkNodesVersion"]]$object
+    .netNodesFunction(".ln1NetData")(jaspResults, NULL, options)
     .netNodesFunction(".ln1NetCreateNetworkPlots")(
       jaspResults, NULL, options, .netNodesFunction(".ln1NetGetDataDependencies"))
     originalUpgrade(jaspResults)
     recorded$currentPlotPreserved <- !is.null(jaspResults[["networkPlotContainer"]])
   }, .package = "jaspLearnN1")
   expect_true(recorded$plotCleared)
-  expect_true(all(recorded$preserved))
+  expect_true(recorded$preserved[["networkSavePath"]])
+  expect_false(any(recorded$preserved[setdiff(names(recorded$preserved), "networkSavePath")]))
   expect_identical(recorded$savedState, list(saved = TRUE))
-  expect_identical(recorded$version, 3L)
+  expect_identical(recorded$version, 4L)
   expect_true(recorded$currentPlotPreserved)
   expect_identical(result$status, "complete")
   graph <- .netNodesExpectPlot(result, options)

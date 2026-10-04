@@ -171,7 +171,8 @@ test_that("partial export names completed and omitted assessments and preserves 
   expect_false(grepl("Unfinished <C & D>", text, fixed = TRUE))
   expect_match(text, "[Oo]mitt|[Ss]kip|[Ii]ncomplete")
   exported <- .netExportRead(path)
-  expect_equal(names(exported), c("type", "time", "name", "severity", "from", "to", "weight"))
+  expect_equal(names(exported), c("type", "time", "name", "severity", "from", "to", "weight",
+                                   "schemaVersion", "severityMaximum", "connectionMaximum", "severityRated"))
   nodes <- exported[exported$type == "node", , drop = FALSE]
   expect_equal(nodes$name, c("A", "B", "C"))
   expect_equal(as.numeric(nodes$severity), c(.8, .2, .5))

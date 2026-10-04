@@ -16,7 +16,9 @@
          ratings = if (allConnections) tab[["allConnectionStrengths"]] else tab[["connections"]])
   })
   return(list(path = options[["networkSavePath"]], problems = options[["problems"]],
-              assessments = assessments))
+              assessments = assessments,
+              severityMaximum = .ln1NetScaleMaximum(options, "networkSeverityMaximum"),
+              connectionMaximum = .ln1NetScaleMaximum(options, "networkConnectionMaximum")))
 }
 
 .ln1NetExportData <- function(jaspResults, options) {
@@ -36,7 +38,16 @@
     )
   }
   emptyNetworkRows <- .ln1NetEmptyNetworkRows(jaspResults[["edgelistContainer"]], options)
-  return(rbind(nodeRows, edgeRows, emptyNetworkRows))
+  result <- rbind(nodeRows, edgeRows, emptyNetworkRows)
+  # Version 2 retains the original canonical numeric columns. Metadata makes
+  # their units explicit even when the input/table display uses another scale.
+  result[["schemaVersion"]] <- 2L
+  result[["severityMaximum"]] <- .ln1NetScaleMaximum(options, "networkSeverityMaximum")
+  result[["connectionMaximum"]] <- .ln1NetScaleMaximum(options, "networkConnectionMaximum")
+  result[["severityRated"]] <- ""
+  result[["severityRated"]][result[["type"]] == "node"] <-
+    ifelse(is.na(nodeAttributes[["strength"]]), "false", "true")
+  return(result)
 }
 
 .ln1NetWriteCsv <- function(data, path) {
@@ -51,7 +62,7 @@
   # avoids cross-filesystem moves; a failed write/rename leaves the old file alone.
   temporary <- tempfile(pattern = ".jasp-network-", tmpdir = dirname(path), fileext = ".csv")
   on.exit(unlink(temporary), add = TRUE)
-  utils::write.csv(data, file = temporary, row.names = FALSE)
+  utils::write.csv(data, file = temporary, row.names = FALSE, na = "")
   if (!file.rename(temporary, path))
     stop(gettext("The CSV could not replace the destination file."), call. = FALSE)
   return(invisible(NULL))

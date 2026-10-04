@@ -1,20 +1,19 @@
 # Preserve the full set of selected problems, including isolated problems.
 
 .ln1NetUpgradeState <- function(jaspResults) {
-  version <- 3L
+  version <- 4L
   marker <- jaspResults[["networkNodesVersion"]]
   if (!is.null(marker) && identical(marker$object, version))
     return(invisible(NULL))
 
   # Version 1 retained isolated nodes. Version 2 adds severity and absolute
   # strength alongside signed sums and replaces the old Degree table labels.
-  # Version 3 omits zero-rated plot edges. Preserve version-2 data, tables and
-  # export state so this plot-only upgrade does not trigger another file write.
-  keys <- "networkPlotContainer"
-  if (is.null(marker) || !identical(marker$object, 2L))
-    keys <- c("nodeAttributesState", "edgelistContainer", "centralityContainer",
-              "centralityTableContainer", "edgeWeightTableContainer",
-              "networkPlotContainer")
+  # Version 3 omitted zero-rated plot edges. Export history is retained across
+  # every result-cache upgrade; rebuilding results never requests a file write.
+  # Version 4 adds display units, explicit unrated severity and optional counts.
+  keys <- c("nodeAttributesState", "edgelistContainer", "centralityContainer",
+            "centralityTableContainer", "edgeWeightTableContainer",
+            "networkPlotContainer")
   # Keep earlier export-attempt markers: the export helper reports their unknown
   # outcome instead of rewriting an old destination during a cache upgrade.
   for (key in keys) {
@@ -32,7 +31,7 @@
 }
 
 .ln1NetValidStrength <- function(strength) {
-  length(strength) == 1L && is.numeric(strength) && is.finite(strength)
+  .ln1NetFiniteScalar(strength) && strength >= -1 && strength <= 1
 }
 
 .ln1NetEdgelistReady <- function(edgelistOptions, nodeNames) {
