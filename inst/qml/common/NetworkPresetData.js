@@ -3,67 +3,8 @@
 // Copyright (C) 2026 University of Amsterdam and Netherlands eScience Center
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-// These are original LearnN1 prompts, not reproduced diagnostic criteria or
-// validated questionnaires. Clinicians and patients can edit them together.
 // Presets contain reusable definitions only: never ratings or assessment tabs.
-
-function builtInNotice()
-{
-    return qsTranslate("NetworkPresets", "These original LearnN1 prompts are editable starting points, not validated questionnaires or diagnostic criteria. Choose and adapt the problems together with the person concerned.");
-}
-
-function builtInPresets()
-{
-    return [
-        _builtIn("lowMood", qsTranslate("NetworkPresets", "Low mood"), [
-            qsTranslate("NetworkPresets", "Low mood"),
-            qsTranslate("NetworkPresets", "Less enjoyment"),
-            qsTranslate("NetworkPresets", "Low energy"),
-            qsTranslate("NetworkPresets", "Self-criticism"),
-            qsTranslate("NetworkPresets", "Social withdrawal"),
-            qsTranslate("NetworkPresets", "Difficulty starting tasks")
-        ]),
-        _builtIn("worryAnxiety", qsTranslate("NetworkPresets", "Worry and anxiety"), [
-            qsTranslate("NetworkPresets", "Worrying"),
-            qsTranslate("NetworkPresets", "Feeling tense"),
-            qsTranslate("NetworkPresets", "Seeking reassurance"),
-            qsTranslate("NetworkPresets", "Avoiding uncertainty"),
-            qsTranslate("NetworkPresets", "Difficulty relaxing"),
-            qsTranslate("NetworkPresets", "Concentration difficulty")
-        ]),
-        _builtIn("sleepDifficulties", qsTranslate("NetworkPresets", "Sleep difficulties"), [
-            qsTranslate("NetworkPresets", "Trouble falling asleep"),
-            qsTranslate("NetworkPresets", "Waking at night"),
-            qsTranslate("NetworkPresets", "Waking too early"),
-            qsTranslate("NetworkPresets", "Daytime tiredness"),
-            qsTranslate("NetworkPresets", "Worry about sleep")
-        ]),
-        _builtIn("stressAvoidance", qsTranslate("NetworkPresets", "Stress and avoidance"), [
-            qsTranslate("NetworkPresets", "Feeling overwhelmed"),
-            qsTranslate("NetworkPresets", "Putting things off"),
-            qsTranslate("NetworkPresets", "Avoiding difficult tasks"),
-            qsTranslate("NetworkPresets", "Irritability"),
-            qsTranslate("NetworkPresets", "Difficulty switching off")
-        ])
-    ];
-}
-
-function _builtIn(id, label, names)
-{
-    var problems = [];
-    for (var i = 0; i < names.length; i++)
-        problems.push({ problemName: names[i] });
-    return {
-        id: id,
-        label: label,
-        preset: {
-            schemaVersion: 1,
-            name: label,
-            problems: problems,
-            scales: { severityMax: 1, connectionMax: 1 }
-        }
-    };
-}
+// Translatable built-in prompts live in NetworkPresetLists.qml.
 
 function _isObject(value)
 {
@@ -92,9 +33,15 @@ function _failure(code, index)
     return result;
 }
 
+// Match .ln1NetPresetTrim exactly; built-in trim differs across R/JavaScript.
+function _trimPresetText(value)
+{
+    return value.replace(/^[\u0009-\u000d\u0020\u0085\u00a0\u1680\u180e\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]+|[\u0009-\u000d\u0020\u0085\u00a0\u1680\u180e\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]+$/g, "");
+}
+
 function _isName(value)
 {
-    return typeof value === "string" && value.trim().length > 0 &&
+    return typeof value === "string" && _trimPresetText(value).length > 0 &&
         !/[\u0000-\u001f\u007f]/.test(value);
 }
 
@@ -133,7 +80,7 @@ function validatePreset(value)
             return _failure("unexpected-fields", i);
         if (!_owns(source, "problemName") || !_isName(source.problemName))
             return _failure("invalid-problem-name", i);
-        var name = source.problemName.trim();
+        var name = _trimPresetText(source.problemName);
         if (names.indexOf(name) !== -1)
             return _failure("duplicate-problem-name", i);
         names.push(name);
@@ -143,7 +90,7 @@ function validatePreset(value)
         {
             if (typeof source.problemDescription !== "string")
                 return _failure("invalid-problem-description", i);
-            problem.problemDescription = source.problemDescription.trim();
+            problem.problemDescription = _trimPresetText(source.problemDescription);
         }
         problems.push(problem);
     }
@@ -169,7 +116,7 @@ function validatePreset(value)
 
     return {
         valid: true,
-        preset: { schemaVersion: 1, name: value.name.trim(), problems: problems, scales: scales }
+        preset: { schemaVersion: 1, name: _trimPresetText(value.name), problems: problems, scales: scales }
     };
 }
 

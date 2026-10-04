@@ -17,6 +17,7 @@
 
 Treatment <- function(jaspResults, dataset = NULL, options) {
   .ln1TreatUpgradeState(jaspResults)
+  .ln1TreatValidateConfidenceLevel(options)
   jaspResults$title <- gettext("Does The Treatment Work?")
 
   .ln1Intro(jaspResults, options, .ln1TreatIntroText)
@@ -91,6 +92,7 @@ Consider endpoint and slope differences together: an improved endpoint can also 
 }
 
 .ln1TreatSimulateData <- function(options) {
+  .ln1TreatValidateSimulation(options)
   set.seed(options[["seed"]])
 
   phaseN <- sapply(options[["simPhaseEffects"]], function(x) x[["simPhaseEffectN"]])
@@ -100,11 +102,11 @@ Consider endpoint and slope differences together: an improved endpoint can also 
 
   totalN <- sum(phaseN)
 
-  yNoise <- stats::arima.sim(
+  yNoise <- tryCatch(stats::arima.sim(
     model = list(ar = options[["simTimeEffectAutocorrelation"]]),
     n = totalN,
     sd = options[["simDependentSd"]]
-  )
+  ), error = function(e) .quitAnalysis(gettext("The treatment simulation could not be generated. Check the phase lengths, noise standard deviation, and stationary autocorrelation settings.")))
 
   phaseName <- rep(phaseNames, phaseN)
   phaseBeta <- rep(phaseEffects, phaseN)
@@ -114,6 +116,8 @@ Consider endpoint and slope differences together: an improved endpoint can also 
   timeEffect <- options[["simTimeEffect"]]
 
   y <- options[["simDependentMean"]] + timeEffect * time + phaseBeta + time * phaseInt + yNoise
+  if (any(!is.finite(y)))
+    .quitAnalysis(gettext("The simulation produced nonfinite outcomes. Use smaller finite means, phase effects, trends, or noise values."))
 
   simData <- data.frame(
     y = y,
@@ -160,6 +164,9 @@ Consider endpoint and slope differences together: an improved endpoint can also 
 }
 
 .ln1TreatEstimateModelHelper <- function(dataset, options) {
+  if (identical(options[["inputType"]], "simulateData") &&
+      isTRUE(options[["simDependentSd"]] == 0))
+    .quitAnalysis(gettext("This zero-noise simulation has no residual variation for model inference. The data plot remains available. Increase the noise standard deviation to estimate uncertainty."))
   variables <- .ln1GetVariableNames(options)
   timing <- attr(dataset, "ln1TreatTime")
   # nlme internally reconstructs formulas without quoting names. Model-only
@@ -174,13 +181,13 @@ Consider endpoint and slope differences together: an improved endpoint can also 
 
   # One individual has a fixed intercept and correlated residuals. There is
   # no between-series random-intercept variance to estimate from this series.
-  mod <- nlme::gls(
+  mod <- tryCatch(nlme::gls(
     model = y ~ time * phase,
     data = modelData,
     correlation = nlme::corAR1(form = ~ occasion),
     method = "REML",
     na.action = stats::na.exclude
-  )
+  ), error = function(e) .quitAnalysis(gettext("The phase-trend model could not be estimated reliably. Check for constant or nearly deterministic outcomes, very short phases, and extreme values. The data plot remains available.")))
   # Build labels from the fitted design; never evaluate decoded user names as
   # formula syntax (a column named '.' would otherwise expand other terms).
   term <- attr(design, "assign")
@@ -197,11 +204,12 @@ Consider endpoint and slope differences together: an improved endpoint can also 
 }
 
 .ln1TreatEstimateModel <- function(jaspResults, dataset, options, ready) {
-  if (ready && is.null(jaspResults[["modelState"]])) {
-    modelObject <- .ln1TreatEstimateModelHelper(dataset, options)
-    modelState <- createJaspState(object = modelObject)
+  if (ready && is.null(jaspResults[["modelState"]]) && is.null(jaspResults[["modelErrorState"]])) {
+    modelObject <- tryCatch(.ln1TreatEstimateModelHelper(dataset, options), error = identity)
+    failed <- inherits(modelObject, "error")
+    modelState <- createJaspState(object = if (failed) conditionMessage(modelObject) else modelObject)
     modelState$dependOn(.ln1TreatGetDataDependencies())
-    jaspResults[["modelState"]] <- modelState
+    jaspResults[[if (failed) "modelErrorState" else "modelState"]] <- modelState
   }
 }
 
@@ -216,14 +224,14 @@ Consider endpoint and slope differences together: an improved endpoint can also 
     table$addColumnInfo(name = "t",            title = gettext("t"),              type = "number")
     table$addColumnInfo(name = "p",            title = gettext("p"),              type = "pvalue")
 
-    overtitle <- gettextf("%.0f%% CI", 100 * options[["coefficientCiLevel"]])
+    overtitle <- .ln1TreatCiTitle(options)
 
     table$addColumnInfo(name = "lower", title = gettext("Lower"), type = "number", overtitle = overtitle)
     table$addColumnInfo(name = "upper", title = gettext("Upper"), type = "number", overtitle = overtitle)
 
     table$addFootnote(gettext("Results are based on generalized least squares regression with AR(1) residual correlation, estimated using restricted maximum likelihood (REML). Coefficients describe phase-specific levels and trends for this individual."))
 
-    if (!is.null(jaspResults[["modelState"]]) && ready) {
+    if (ready && !.ln1TreatSetModelError(table, jaspResults) && !is.null(jaspResults[["modelState"]])) {
       .ln1TreatCoefficientContext(table, jaspResults[["modelState"]]$object, options)
       .ln1TreatFillCoefficientsTable(table, jaspResults[["modelState"]]$object, options)
     }
@@ -234,7 +242,7 @@ Consider endpoint and slope differences together: an improved endpoint can also 
 
 .ln1TreatFillCoefficientsTable <- function(table, modelObject, options) {
   modelSummary <- summary(modelObject)
-  modelCoefficients <- data.frame(coef(modelSummary))
+  modelCoefficients <- data.frame(stats::coef(modelSummary))
 
   table[["name"]] <- attr(modelObject, "ln1TreatCoefficientNames")
   table[["coef"]] <- modelCoefficients[["Value"]]
@@ -258,14 +266,15 @@ Consider endpoint and slope differences together: an improved endpoint can also 
     table$addColumnInfo(name = "name",         title = "",                        type = "string")
     table$addColumnInfo(name = "coef",         title = gettext("Estimate"),       type = "number")
 
-    overtitle <- gettextf("%.0f%% CI", 100 * options[["coefficientCiLevel"]])
+    overtitle <- .ln1TreatCiTitle(options)
 
     table$addColumnInfo(name = "lower", title = gettext("Lower"), type = "number", overtitle = overtitle)
     table$addColumnInfo(name = "upper", title = gettext("Upper"), type = "number", overtitle = overtitle)
 
     table$addFootnote(gettext("The AR(1) coefficient is the residual correlation over one measurement interval. Across k intervals, the model uses this coefficient raised to the power k. Missing outcomes preserve their time positions; autocorrelation continues across phase boundaries."))
+    table$addFootnote(gettext("The autocorrelation interval uses a transformed-normal approximation. Short series can underestimate autocorrelation and give unreliable intervals."))
 
-    if (!is.null(jaspResults[["modelState"]]) && ready) {
+    if (ready && !.ln1TreatSetModelError(table, jaspResults) && !is.null(jaspResults[["modelState"]])) {
       .ln1TreatFillAutoCorTable(table, jaspResults[["modelState"]]$object, options)
     }
 
@@ -278,7 +287,7 @@ Consider endpoint and slope differences together: an improved endpoint can also 
 
   # Point estimate is always available from the model
   corStruct <- modelObject[["modelStruct"]][["corStruct"]]
-  phi <- as.numeric(coef(corStruct, unconstrained = FALSE))
+  phi <- as.numeric(stats::coef(corStruct, unconstrained = FALSE))
   table[["coef"]] <- phi
 
   # Variance-component intervals can be unavailable even away from a boundary.
@@ -349,7 +358,7 @@ Consider endpoint and slope differences together: an improved endpoint can also 
       position = 4
     )
     analysisPlot$dependOn(c("plotAnalysis", .ln1TreatGetDataDependencies()))
-    if (ready && !is.null(jaspResults[["modelState"]])) {
+    if (ready && !.ln1TreatSetModelError(analysisPlot, jaspResults) && !is.null(jaspResults[["modelState"]])) {
       analysisPlot$plotObject <- .ln1TreatCreateAnalysisPlotFill(dataset, jaspResults[["modelState"]]$object, options)
     }
     jaspResults[["analysisPlot"]] <- analysisPlot

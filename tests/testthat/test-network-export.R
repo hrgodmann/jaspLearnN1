@@ -255,6 +255,8 @@ test_that("same-path retries use both request-toggle transitions and cosmetic re
     recorded$falseRequestWrote <- identical(readLines(path), recorded$savedLines)
 
     requested$connectionList[[1L]]$connections[[1L]]$connectionStrength <- -.7
+    # Direct helper calls do not dispatch engine option invalidation.
+    jaspResults[["edgelistContainer"]] <- NULL
     .netExportFunction(".ln1NetData")(jaspResults, NULL, requested)
     save(jaspResults, requested)
     recorded$editedDataState <- jaspResults[["networkSavePath"]]$object
@@ -262,10 +264,13 @@ test_that("same-path retries use both request-toggle transitions and cosmetic re
     recorded$editedDataPreserved <- identical(readLines(path), recorded$savedLines)
     reverted <- requested
     reverted$connectionList[[1L]]$connections[[1L]]$connectionStrength <- .5
+    jaspResults[["edgelistContainer"]] <- NULL
     .netExportFunction(".ln1NetData")(jaspResults, NULL, reverted)
     save(jaspResults, reverted)
     recorded$undoneDataState <- jaspResults[["networkSavePath"]]$object
     recorded$undoneDataPreserved <- identical(readLines(path), recorded$savedLines)
+    # Direct helper calls do not dispatch engine option invalidation.
+    jaspResults[["edgelistContainer"]] <- NULL
     .netExportFunction(".ln1NetData")(jaspResults, NULL, requested)
     save(jaspResults, requested)
     requested$networkExportRequest <- TRUE
@@ -295,7 +300,7 @@ test_that("same-path retries use both request-toggle transitions and cosmetic re
   expect_true(output$recorded$editedDataPreserved)
   expect_match(output$recorded$editedDataText, "Changes have not been exported.", fixed = TRUE)
   expect_false(grepl("Exported Rated assessment", output$recorded$editedDataText, fixed = TRUE))
-  expect_identical(output$recorded$editedDataState$lastAttempt$status, "success")
+  expect_null(output$recorded$editedDataState$lastAttempt)
   expect_identical(output$recorded$undoneDataState$status, "pending")
   expect_true(output$recorded$undoneDataPreserved)
   changedRatings <- output$recorded$changedRatings
@@ -492,7 +497,7 @@ test_that("journal migration and same-session reruns never replay their saved ex
         .netExportExpectAnalysisOutputs(result)
         expect_identical(recorded$restoredState$version, 3L)
         expect_identical(recorded$restoredState$observedRequest, options$networkExportRequest)
-        expect_identical(recorded$restoredState$status, if (changed) "pending" else "success")
+        expect_identical(recorded$restoredState$status, if (version < 3L) "legacy" else if (changed) "pending" else "success")
         expect_true(recorded$restoredPreserved)
         expect_true(recorded$repeatedPreserved)
         expect_identical(recorded$clickedState$status, "success")

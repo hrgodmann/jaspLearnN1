@@ -117,19 +117,14 @@
   if (!current) {
     previous <- record
     record <- list(version = 3L, session = session, observedRequest = observedRequest,
-                   request = request, status = if (is.null(state)) "pending" else "legacy",
-                   lastAttempt = NULL)
+                   request = request, status = if (is.null(state)) "pending" else "legacy")
     # QML resets the button to FALSE and creates a fresh session after restoring
     # controls. TRUE in that fresh session is the first actual click, even if
     # opening a completed analysis did not run R before the user pressed it.
     clicked <- hasSession && observedRequest
-    if (is.list(previous) && isTRUE(previous[["version"]] %in% c(1L, 2L, 3L))) {
-      if (identical(previous[["version"]], 1L))
-        previous[["request"]][["retry"]] <- NULL
-      record[["lastAttempt"]] <- previous[["lastAttempt"]]
-      if (is.null(record[["lastAttempt"]]) &&
-          previous[["status"]] %in% c("success", "failed", "incomplete"))
-        record[["lastAttempt"]] <- previous[c("request", "status", "completed", "omitted", "error")]
+    # Only the current record schema can certify an earlier outcome. Older
+    # records remain unknown until the user explicitly saves again.
+    if (is.list(previous) && identical(previous[["version"]], 3L)) {
       if (identical(previous[["request"]], request)) {
         for (key in c("status", "completed", "omitted", "error"))
           record[[key]] <- previous[[key]]
@@ -169,9 +164,9 @@
       record[["status"]] <- if (is.null(error)) "success" else "failed"
       record[["error"]] <- error
     }
-    record[["lastAttempt"]] <- record[c("request", "status", "completed", "omitted", "error")]
   }
 
+  record[["lastAttempt"]] <- NULL
   # Persist the observed button value across every rerun and path clearing.
   # This side-effect journal intentionally has no option dependencies. The
   # current payload is compared above; only a new button transition may write.

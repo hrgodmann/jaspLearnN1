@@ -100,6 +100,7 @@ test_that("Treatment explains numerically unestimable absolute time values", {
   options$enableIntroText <- FALSE
   options$plotData <- options$plotAnalysis <- FALSE
   result <- jaspTools::runAnalysis("Treatment", data, options, view = FALSE)
-  expect_identical(result$status, "validationError")
-  expect_match(result$results$errorMessage, "time relative to the start")
+  expect_identical(result$status, "complete")
+  expect_identical(result$results$phaseComparisons$status, "error")
+  expect_match(result$results$phaseComparisons$error$errorMessage, "time relative to the start")
 })

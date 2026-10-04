@@ -45,7 +45,7 @@
     name <- if (is.list(rows[[i]])) rows[[i]][[field]] else NULL
     valid <- is.character(name) && length(name) == 1L && !is.na(name)
     if (valid)
-      name <- trimws(name, whitespace = "[\\h\\v]")
+      name <- .ln1NetPresetTrim(name)
     if (!valid || !nzchar(name)) {
       if (problems)
         .quitAnalysis(gettextf("Enter a nonblank name for problem %1$i.", i))
@@ -94,10 +94,17 @@
   for (assessment in assessments) {
     name <- assessment[["name"]]
     if (isTRUE(assessment[["allConnections"]])) {
-      rows <- assessment[["allConnectionStrengths"]]
+      matrix <- .ln1NetAllConnectionMatrix(assessment[["allConnectionStrengths"]], nodeNames)
+      if (matrix[["invalidKeys"]])
+        .quitAnalysis(gettextf("The all-pairs ratings in assessment '%1$s' contain missing, duplicate or unknown problem keys. Restore one source and target row per selected problem.", name))
+      rows <- matrix[["rows"]]
+      if (is.null(rows)) rows <- assessment[["allConnectionStrengths"]]
       for (i in seq_along(rows)) {
         targets <- rows[[i]][["targets"]]
-        for (j in setdiff(seq_along(targets), i))
+        diagonal <- if ("value" %in% names(rows[[i]]))
+          vapply(targets, function(target) identical(target[["value"]], rows[[i]][["value"]]), logical(1))
+        else seq_along(targets) == i
+        for (j in which(!diagonal))
           .ln1NetValidateConnectionStrength(targets[[j]][["connectionStrength"]], name)
       }
     } else {

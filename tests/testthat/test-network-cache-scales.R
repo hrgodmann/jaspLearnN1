@@ -71,7 +71,7 @@ test_that("display scale edits stay pending until an explicit CSV export updates
   expect_identical(observed$initialWrites, 0L)
   expect_identical(observed$first$status, "success")
   expect_identical(observed$edited$status, "pending")
-  expect_identical(observed$edited$lastAttempt$status, "success")
+  expect_null(observed$edited$lastAttempt)
   expect_match(observed$editedText, "Changes have not been exported.", fixed = TRUE)
   expect_false(grepl("Exported Assessment", observed$editedText, fixed = TRUE))
   expect_identical(observed$editedWrites, 1L)
@@ -110,4 +110,107 @@ test_that("optional connection count edits never dirty or rewrite an unchanged C
   expect_identical(output$recorded$initialWrites, 0L)
   expect_identical(output$recorded$writes, 1L)
   expect_identical(output$recorded$final$status, "success")
+})
+
+test_that("native dependency invalidation refreshes Network outputs without replaying exports", {
+  path <- tempfile(fileext = ".csv")
+  on.exit(unlink(path), add = TRUE)
+  writeLines("existing export", path)
+  options <- .netCacheScaleOptions(path)
+  options$connectionList[[1L]]$plotNetwork <- TRUE
+  run <- .netCacheScaleFunction("Network")
+  save <- .netCacheScaleFunction(".ln1NetSaveNetwork")
+  plot <- .netCacheScaleFunction(".ln1NetCreateNetworkPlotFill")
+  summary <- .netCacheScaleFunction(".ln1NetCentralitySingle")
+  write <- .netCacheScaleFunction(".ln1NetWriteCsv")
+  load <- getFromNamespace("loadJaspResults", "jaspBase")
+  native <- NULL
+  recorded <- new.env(parent = emptyenv())
+  recorded$entered <- FALSE
+  recorded$plots <- recorded$summaries <- recorded$writes <- 0L
+  # Capture the context-created native object without reading R6 private slots.
+  # changeOptions is the exposed C++ method documented specifically for tests;
+  # it performs real dependency invalidation. This is not a Desktop UI test.
+  testthat::local_mocked_bindings(loadJaspResults = function(name) {
+    native <<- load(name)
+    native
+  }, .package = "jaspBase")
+  result <- testthat::with_mocked_bindings({
+    jaspTools::runAnalysis("Network", NULL, options, view = FALSE)
+  }, .ln1NetCreateNetworkPlotFill = function(...) {
+    recorded$plots <- recorded$plots + 1L
+    plot(...)
+  }, .ln1NetCentralitySingle = function(...) {
+    recorded$summaries <- recorded$summaries + 1L
+    summary(...)
+  }, .ln1NetWriteCsv = function(data, path) {
+    recorded$writes <- recorded$writes + 1L
+    write(data, path)
+  }, .ln1NetSaveNetwork = function(jaspResults, options) {
+    save(jaspResults, options)
+    if (recorded$entered) return(invisible(NULL))
+    recorded$entered <- TRUE
+    change <- function(options) {
+      # Match runAnalysis's JSON representation; changing scalar/array encoding
+      # would invalidate dependencies even when their R values are unchanged.
+      native$changeOptions(jsonlite::toJSON(options))
+    }
+    run(jaspResults, NULL, options)
+    recorded$reused <- c(recorded$plots, recorded$summaries)
+
+    options$colorPalette <- "viridis"
+    change(options)
+    recorded$appearanceRetainsData <- !is.null(jaspResults[["nodeAttributesState"]]) &&
+      !is.null(jaspResults[["edgelistContainer"]]) && !is.null(jaspResults[["centralityContainer"]])
+    recorded$appearanceClearsPlot <- is.null(jaspResults[["networkPlotContainer"]][["Assessment"]])
+    run(jaspResults, NULL, options)
+    recorded$appearanceCounts <- c(recorded$plots, recorded$summaries)
+
+    options$connectionList[[1L]]$connections[[1L]]$connectionStrength <- -.25
+    change(options)
+    recorded$ratingClears <- vapply(c("edgelistContainer", "centralityContainer", "networkPlotContainer"),
+      function(key) is.null(jaspResults[[key]]), logical(1))
+    run(jaspResults, NULL, options)
+    recorded$weight <- jaspResults[["edgelistContainer"]][["Assessment"]]$object$weight
+
+    options$problems[[1L]]$problemSeverity <- .4
+    change(options)
+    recorded$severityClearsNode <- is.null(jaspResults[["nodeAttributesState"]])
+    run(jaspResults, NULL, options)
+    recorded$severity <- jaspResults[["nodeAttributesState"]]$object$strength
+
+    options$networkSeverityMaximum <- 100
+    options$networkConnectionMaximum <- 10
+    change(options)
+    run(jaspResults, NULL, options)
+    options$networkConnectionCounts <- TRUE
+    change(options)
+    run(jaspResults, NULL, options)
+    recorded$beforeClick <- recorded$writes
+    recorded$preserved <- identical(readLines(path), "existing export")
+    recorded$beforeClickCounts <- c(recorded$plots, recorded$summaries)
+
+    options$networkExportRequest <- TRUE
+    change(options)
+    run(jaspResults, NULL, options)
+    recorded$afterClickCounts <- c(recorded$plots, recorded$summaries)
+  }, .package = "jaspLearnN1")
+  expect_identical(result$status, "complete")
+  expect_identical(recorded$reused, c(1L, 1L))
+  expect_true(recorded$appearanceRetainsData)
+  expect_true(recorded$appearanceClearsPlot)
+  expect_identical(recorded$appearanceCounts, c(2L, 1L))
+  expect_true(all(recorded$ratingClears))
+  expect_equal(recorded$weight, c(-.25, 0))
+  expect_true(recorded$severityClearsNode)
+  expect_equal(recorded$severity, c(.4, NA, 0))
+  expect_identical(recorded$beforeClick, 0L)
+  expect_true(recorded$preserved)
+  expect_identical(recorded$writes, 1L)
+  expect_identical(recorded$afterClickCounts, recorded$beforeClickCounts)
+  table <- result$results$centralityTableContainer$collection$centralityTableContainer_Assessment
+  rows <- do.call(rbind, lapply(table$data, as.data.frame))
+  expect_equal(as.numeric(rows$severity[c(1, 3)]), c(40, 0))
+  expect_equal(as.numeric(rows$strengthOut), c(2.5, 0, 0))
+  expect_equal(as.numeric(rows$countOut), c(1, 0, 0))
 })

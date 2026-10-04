@@ -11,6 +11,11 @@ const presetSource = fs.readFileSync(path.resolve(__dirname, '../../inst/qml/com
 const Presets = vm.createContext({ qsTranslate: (_, text) => text });
 vm.runInContext(presetSource, Presets);
 
+const listsFile = path.resolve(__dirname, "../../inst/qml/common/NetworkPresetLists.qml");
+const listsSource = fs.readFileSync(listsFile, "utf8");
+Presets.qsTr = text => text;
+vm.runInContext(listsSource.slice(listsSource.indexOf("{", listsSource.indexOf("QtObject")) + 1, listsSource.lastIndexOf("}")), Presets, {filename: listsFile});
+
 function extractFunction(source, name) {
     const match = new RegExp('\\bfunction\\s+' + name + '\\s*\\(').exec(source);
     assert.ok(match, 'missing actual QML function ' + name);

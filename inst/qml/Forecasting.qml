@@ -90,8 +90,9 @@ Form
 				DoubleField
 				{
 					name: "noiseSd"
-					label: "Noise std. deviation"
+					label: qsTr("Noise standard deviation")
 					defaultValue: 1.0
+					min: 0
 					info: qsTr("The standard deviation of the noise component in the simulated ARIMA process.")
 				}
 
@@ -100,6 +101,7 @@ Form
 					name: "numSamples"
 					label: qsTr("N")
 					defaultValue: 100
+					min: 2
 					info: qsTr("The number of time points to simulate.")
 				}
 			}
@@ -149,6 +151,7 @@ Form
 					id:     d
 					label:  qsTr("Difference (I) degree d")
 					defaultValue: 1
+					min: 0
 					info: qsTr("The degree of differencing applied to the time series to achieve stationarity.")
 				}
 
@@ -237,7 +240,7 @@ Form
 				value: "custom"
 				id: manualModel
 				label: qsTr("Manual")
-				info: qsTr("Fits an ARIMA model with the specified nonseasonal orders.")
+				info: qsTr("Fits the chosen orders, including a mean at d = 0 or drift at d = 1. No constant is included for d > 1.")
 
 				Group
 				{
@@ -307,19 +310,20 @@ Form
 	Section
 	{
 		title: qsTr("Forecasting")
-		info: qsTr("Forecasts start after the last observed outcome. With covariates, append future rows containing all predictor values and leave the outcome empty. Fill in future times too if a time variable is selected. Prediction intervals are conditional on these supplied values and do not include uncertainty in the predictor scenario.")
+		info: qsTr("Forecasts start after the last observed outcome. With covariates, supply future predictor values and leave future outcomes empty. Intervals condition on the fitted model and supplied predictor values; parameter, model-selection and predictor-scenario uncertainty are not included.")
 		IntegerField
 		{
 			name: "forecastLength"
 			id: forecastLength
 			label: qsTr("Number of forecasts")
 			min: 0
-			max: 1e6
+			max: 10000
 			defaultValue: 0
-			info: qsTr("The number of measurement steps to forecast after the last observed outcome. With covariates, supply at least this many future rows; only the requested rows are used.")
+			info: qsTr("Measurement steps to forecast. Supply this many future predictor rows when using covariates. The 10000-step limit controls resource use, not statistical reliability.")
 		}
 		FileSelector
 		{
+			id: forecastSave
 			name:				"forecastSave"
 			label:				qsTr("Save forecasts as")
 			placeholderText:	qsTr("e.g. forecasts.csv")
@@ -327,7 +331,37 @@ Form
 			save:				true
 			enabled:			forecastLength.value > 0
 			fieldWidth:			180 * preferencesModel.uiScale
-			info:				qsTr("Saves the forecasts in a seperate .csv file.")
+			info:				qsTr("Choose the CSV destination. Selecting a file or editing the analysis does not save; press Export CSV / Save again.")
+		}
+		Button
+		{
+			label: qsTr("Export CSV / Save again")
+			enabled: forecastSave.value !== "" && forecastExportSession.value !== "" && forecastLength.value > 0
+			onClicked: forecastExportRequest.checked = !forecastExportRequest.checked
+			CheckBox
+			{
+				id: forecastExportRequest
+				name: "forecastExportRequest"
+				checked: false
+				visible: false
+				onInitializedChanged: if (initialized) checked = false
+			}
+		}
+		TextField
+		{
+			id: forecastExportSession
+			name: "forecastExportSession"
+			value: ""
+			visible: false
+			// Saved controls bind before this signal; JASP blocks analysis updates
+			// until initialization completes. Never reuse a saved write session.
+			onInitializedChanged: if (initialized) value = "session-" + Date.now() + "-" + Math.random()
+		}
+		Label
+		{
+			text: qsTr("Only Export CSV / Save again writes the file. An existing file at the selected destination will be replaced.")
+			wrapMode: Text.WordWrap
+			Layout.preferredWidth: 400 * preferencesModel.uiScale
 		}
 		CheckBox
 		{

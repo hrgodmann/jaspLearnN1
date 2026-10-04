@@ -55,7 +55,7 @@ test_that("legacy forecast states and displayed results are rebuilt with covaria
   result <- jaspTools::runAnalysis("Forecasting", data, options, view = FALSE)
   expect_true(recorded$called)
   expect_true(all(recorded$cleared))
-  expect_identical(recorded$version, 2L)
+  expect_identical(recorded$version, 3L)
   expect_identical(result$status, "complete")
 
   reference <- forecast::Arima(y, order = c(0, 0, 0),

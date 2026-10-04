@@ -1,14 +1,27 @@
 on:
   push:
-    paths: ['**.R', 'tests/**', '**.Rd', '**.c', '**.cpp', '**.h', '**.hpp', 'DESCRIPTION', 'NAMESPACE', 'MAKEVARS', 'MAKEVARS.win', '**.yml']
+    paths: ['**.R', '**.qml', '**.js', 'tests/**', '**.Rd', '**.c', '**.cpp', '**.h', '**.hpp', 'DESCRIPTION', 'NAMESPACE', 'renv.lock', 'MAKEVARS', 'MAKEVARS.win', '**.yml']
   pull_request:
-    paths: ['**.R', 'tests/**', '**.Rd', '**.c', '**.cpp', '**.h', '**.hpp', 'DESCRIPTION', 'NAMESPACE', 'MAKEVARS', 'MAKEVARS.win']
+    paths: ['**.R', '**.qml', '**.js', 'tests/**', '**.Rd', '**.c', '**.cpp', '**.h', '**.hpp', 'DESCRIPTION', 'NAMESPACE', 'renv.lock', 'MAKEVARS', 'MAKEVARS.win', '**.yml']
   schedule:
     - cron:  '13 12 * * 1-5'
 
 name: unit-tests
 
 jobs:
+
+  qml-javascript:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+      - name: Check preset definitions and form actions
+        run: |
+          node tests/qml/test-network-presets.js
+          node tests/qml/test-network-actions.js
+          node tests/qml/test-forecasting-actions.js
 
   unit-tests:
 

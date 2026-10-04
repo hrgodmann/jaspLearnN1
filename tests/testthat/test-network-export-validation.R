@@ -110,7 +110,7 @@
   expect_identical(observed$clicked$status, "success")
   expect_identical(observed$clickedWrites, observed$beforeWrites + 1L)
   if (scenario$previous %in% c("saved", "reopened")) {
-    expect_identical(observed$blocked$lastAttempt$status, "success")
+    expect_null(observed$blocked$lastAttempt)
     expect_identical(observed$repaired$lastAttempt, observed$blocked$lastAttempt)
   }
 }

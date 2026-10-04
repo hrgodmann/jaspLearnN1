@@ -198,7 +198,7 @@ test_that("unmarked and version-one caches rebuild the new connection-summary sc
       recorded$version <- jaspResults[["networkNodesVersion"]]$object
     }, .package = "jaspLearnN1")
     expect_true(recorded$cleared)
-    expect_identical(recorded$version, 4L)
+    expect_identical(recorded$version, 5L)
     expect_identical(result$status, "complete")
     expect_equal(result$results$centralityTableContainer$title, "Connection Summaries")
     .netSummaryExpectRows(.netSummaryRows(.netSummaryTable(result)), expected)

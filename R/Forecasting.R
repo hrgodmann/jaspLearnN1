@@ -17,6 +17,9 @@
 
 Forecasting <- function(jaspResults, dataset = NULL, options) {
   .ln1ForeUpgradeState(jaspResults)
+  # Consume a save click before validation/fitting. Repairing an error later is
+  # a new analysis run, not permission to replay an earlier file write.
+  exportEvent <- .ln1ForeBeginExport(jaspResults, options)
   jaspResults$title <- gettext("How Do Symptoms Develop?")
 
   .ln1Intro(jaspResults, options, .ln1ForeIntroText)
@@ -35,27 +38,23 @@ Forecasting <- function(jaspResults, dataset = NULL, options) {
 
   fit <- if (ready) jaspResults[["modelState"]]$object else NULL
   .ln1ForeCreateCoefficientTable(jaspResults, fit, options, ready)
-  .ln1ForeCreateForecastOutputs(jaspResults, dataset, fit, options, ready)
+  prediction <- .ln1ForeCreateForecastOutputs(jaspResults, dataset, fit, options, ready)
+  .ln1ForeSaveForecast(jaspResults, dataset, options, prediction, ready, exportEvent)
 
   return()
 }
 
 .ln1ForeIntroText <- function() {
-  return(gettext("Forecasting uses past observations to predict future developments. In clinical practice, it can help anticipate possible changes in a client's symptoms. A forecast alone does not establish whether treatment is effective or justify continuing, changing, or stopping it. Forecasts can support discussion between a therapist and client alongside clinical assessment and the client's goals and preferences.
-
-<b>How does it work?</b> 
-
-Forecasting is an umbrella term that covers many different analytical techniques, several of which are implemented in JASP. This tutorial focuses on the autoregressive integrated moving average (ARIMA) model, a widely used approach in forecasting. The autoregressive (AR) part means that the current value of a variable is predicted from its previous values. The moving average (MA) part means that the current value is also influenced by past prediction errors. The integrated (I) part means that the model uses differences between consecutive observations (rather than the raw values) to handle trends in the data. When covariates are selected, their associations with the outcome are estimated jointly, and the ARIMA structure describes the remaining errors. Forecasting then requires a value for each predictor at every future measurement occasion.
-
-<b>Practical considerations</b> 
-
-A key practical question in clinical forecasting is how often to collect measurements. In general, more frequent measurements can lead to better predictions. At the same time, it is important to consider what is feasible for a client and at which time scale meaningful changes actually occur. For example, if symptoms do not change much from day to day, daily assessment will not add much information. On the other hand, if measurements are taken only once every three months, important changes in the treatment process may be missed, making predictions less accurate. As a rule of thumb, weekly measurements are often a reasonable starting point. Forecasting models learn patterns from past data and can help therapists and clients discuss possible future symptom changes. However, the accuracy of these predictions depends strongly on the quality and level of detail (granularity) of the available data.
-
-<b>Interpretation and limitations</b> 
-
-Forecasting provides an prediction on the future clinical outcome. Note that -just like any prediction- this comes with an uncertainty, or prediction error. Forecasting therefore just gives a likely outcome, but this does not mean it will happen. Also, the further into the future you forecast, the less confident the model becomes, which is reflected in wider uncertainty ranges. Specifically, the ARIMA model only work well with relatively stable data, consistent way over time, and it struggles when something unexpected shifts the trend. The model can account for supplied covariates, but cannot anticipate changes in factors that have not been included. Forecasts and prediction intervals with covariates are conditional on the supplied future predictor values; uncertainty about those values is not included. If set up poorly, it can also memorise past data rather than learning genuine patterns, leading to poor real-world predictions.
-
-"))
+  paragraphs <- c(
+    gettext("Forecasting uses past observations to predict possible future outcomes. A forecast alone does not establish whether treatment is effective or justify continuing, changing, or stopping it. Use it alongside clinical assessment and the client's goals and preferences."),
+    paste0("<b>", gettext("How does it work?"), "</b>"),
+    gettext("This tutorial uses autoregressive integrated moving average (ARIMA) models. Autoregressive terms describe dependence on earlier observations; moving-average terms describe dependence on earlier prediction errors. Differencing models changes between consecutive observations. With covariates, regression estimates their associations with the outcome and ARIMA models the remaining errors. Forecasting then requires future values for every selected predictor."),
+    paste0("<b>", gettext("Practical considerations"), "</b>"),
+    gettext("Choose a regular measurement interval that reflects how quickly the outcome can change and what is feasible for the client. Keep rows for missed measurements. Predictions rely on the historical relationships continuing; unexpected changes can make them inaccurate."),
+    paste0("<b>", gettext("Interpretation and limitations"), "</b>"),
+    gettext("Prediction intervals describe uncertainty about future observations under the fitted model. They omit uncertainty in estimated parameters and automatic model selection. With covariates, they also omit uncertainty in the supplied future predictor values. Wider intervals indicate greater uncertainty, not a guaranteed range of outcomes.")
+  )
+  return(paste(paragraphs, collapse = "\n\n"))
 } 
 
 .ln1ForeData <- function(jaspResults, dataset, options, ready) {
@@ -85,7 +84,7 @@ Forecasting provides an prediction on the future clinical outcome. Note that -ju
 }
 
 .ln1ForeCovariates <- function(options) {
-  if (options[["inputType"]] == "loadData")
+  if (identical(options[["inputType"]], "loadData"))
     return(as.character(options[["covariates"]]))
   return(character())
 }
@@ -221,12 +220,13 @@ Forecasting provides an prediction on the future clinical outcome. Note that -ju
 }
 
 .ln1ForeSimulateData <- function(options) {
+  .ln1ForeValidateSimulation(options)
   set.seed(options[["seed"]])
 
-  arEffects <- sapply(options[["simArEffects"]], function(x) x[["simArEffect"]])
-  maEffects <- sapply(options[["simMaEffects"]], function(x) x[["simMaEffect"]])
+  arEffects <- vapply(options[["simArEffects"]], function(x) x[["simArEffect"]], numeric(1))
+  maEffects <- vapply(options[["simMaEffects"]], function(x) x[["simMaEffect"]], numeric(1))
 
-  y <- stats::arima.sim(
+  y <- tryCatch(stats::arima.sim(
     model = list(
       "ar" = arEffects,
       "ma" = maEffects,
@@ -234,9 +234,15 @@ Forecasting provides an prediction on the future clinical outcome. Note that -ju
     ),
     n = options[["numSamples"]],
     sd = options[["noiseSd"]]
-  )
+  ), error = function(e) .quitAnalysis(gettext("The series could not be simulated. Check the sample size, differencing order and AR/MA coefficients, then try again.")))
 
-  y <- y[-1]
+  # arima.sim returns d initialization values from un-differencing. Removing
+  # exactly those values retains N observations and preserves the seeded d=1 run.
+  differences <- options[["simIEffect"]]
+  if (differences > 0L)
+    y <- y[-seq_len(differences)]
+  if (length(y) != options[["numSamples"]] || any(!is.finite(y)))
+    .quitAnalysis(gettext("The simulated values are not finite. Reduce the differencing order, coefficient magnitudes or noise standard deviation."))
 
   simData <- data.frame(
     y = as.numeric(y),
@@ -304,12 +310,11 @@ Forecasting provides an prediction on the future clinical outcome. Note that -ju
 
 .ln1ForeForecastHelper <- function(dataset, fit, options) {
   horizon <- options[["forecastLength"]]
-  if (length(horizon) != 1L || !is.finite(horizon) || horizon < 1L || horizon != as.integer(horizon))
-    .quitAnalysis(gettext("The number of forecasts must be a positive integer."))
+  .ln1ForeValidateHorizon(horizon)
   historical <- .ln1ForeHistoricalData(dataset)
   n <- nrow(historical)
   step <- .ln1ForeTimeStep(historical)
-  lastTime <- tail(historical[["t"]], 1L)
+  lastTime <- utils::tail(historical[["t"]], 1L)
   forecastTimes <- lastTime + step * seq_len(horizon)
   if (any(!is.finite(forecastTimes)) || any(diff(c(lastTime, forecastTimes)) <= 0))
     .quitAnalysis(gettext("Future time values cannot be represented reliably at this spacing. Express time relative to the start of the series or request a shorter forecast horizon."))

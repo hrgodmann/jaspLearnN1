@@ -15,6 +15,9 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+# The .data pronoun is evaluated by ggplot2/dplyr, not as a package variable.
+utils::globalVariables(".data", package = environment())
+
 .ln1Intro <- function(jaspResults, options, textFun) {
   if (options[["enableIntroText"]] && is.null(jaspResults[["introText"]])) {
     introText <- createJaspHtml(

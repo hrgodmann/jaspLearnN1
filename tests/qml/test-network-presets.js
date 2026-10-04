@@ -5,11 +5,13 @@ const path = require('node:path');
 
 const file = path.resolve(__dirname, '../../inst/qml/common/NetworkPresetData.js');
 const source = fs.readFileSync(file, 'utf8').replace(/^\.pragma library\r?\n/, '');
-const context = vm.createContext({ qsTranslate: (context, text) => {
-    assert.equal(context, 'NetworkPresets');
-    return text;
-} });
+const context = vm.createContext({});
 vm.runInContext(source, context, { filename: file });
+
+const listsFile = path.resolve(__dirname, "../../inst/qml/common/NetworkPresetLists.qml");
+const listsSource = fs.readFileSync(listsFile, "utf8");
+context.qsTr = text => text;
+vm.runInContext(listsSource.slice(listsSource.indexOf("{", listsSource.indexOf("QtObject")) + 1, listsSource.lastIndexOf("}")), context, {filename: listsFile});
 let checks = 0;
 function check(value, message) { assert.ok(value, message); checks++; }
 function preset() {
@@ -92,4 +94,13 @@ for (const text of ['', 'function () {}', '{', '{"schemaVersion":1,}', undefined
     check(context.parsePreset(text).errorCode === 'invalid-json', 'reject malformed JSON');
 }
 check(context.serializePreset(null).errorCode === 'invalid-preset', 'serialization validates first');
+const fixtures = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../fixtures/network-preset-normalization.json'), 'utf8'));
+for (const fixture of fixtures) {
+    const result = context.validatePreset(fixture.input);
+    check(result.valid === fixture.valid, fixture.description);
+    if (result.valid) {
+        assert.deepEqual(JSON.parse(JSON.stringify(result.preset)), fixture.expected, fixture.description);
+        checks++;
+    }
+}
 console.log(checks + ' preset helper checks passed.');

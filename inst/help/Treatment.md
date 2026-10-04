@@ -15,7 +15,7 @@ For example, with baseline at times 1–20 and treatment at 21–40, Treatment m
 
 **Phase estimates** optionally shows each phase's fitted endpoint and forward slope, with confidence intervals. All estimates and comparisons use the same fitted GLS model, including its full coefficient covariance. Selecting another comparison does not change the fitted lines or residual autocorrelation. The confidence-level control applies to coefficients, phase estimates, comparisons, and autocorrelation intervals.
 
-Each compared or summarized phase must be one continuous period. For an A–B–A design, use distinct episode names such as Baseline 1, Treatment, and Baseline 2. Repeated episode labels cannot silently be interpreted as a single endpoint; the affected table asks you to rename them. Other model outputs remain available. More than two phases can be fitted jointly, and a single pair can be selected for comparison.
+Each phase must be one continuous period. For an A–B–A design, use distinct episode names such as Baseline 1, Treatment, and Baseline 2. Reused labels are rejected before fitting, so separate episodes cannot silently share one regression line. More than two distinctly named phases can be fitted jointly, and a single pair can be selected for comparison.
 
 ### Relation to the published N=1 approach
 
@@ -25,6 +25,8 @@ Each compared or summarized phase must be one continuous period. For an A–B–
 
 Consider endpoint and slope differences together. A better treatment endpoint can reflect an improvement trend that already existed before treatment. Phase-associated differences alone do not establish that treatment caused the change, and a small p-value does not establish clinical importance. Judge the magnitude of change in the context of the outcome measure.
 
+For example, if a score falls by 0.2 at every occasion from time 1 through 40, with treatment starting at 21, its expected difference between the endpoints at 40 and 20 is −4. An endpoint test can detect that change even though neither the slope nor the level changed at treatment onset. It answers whether the endpoints differ, not why.
+
 The comparison table reports two unadjusted tests, one for each question; it is not a single test of treatment success. Inspecting many pairs or selecting comparisons after examining results increases the scope of testing. This interface does not implement an all-pairs post hoc procedure or an omnibus test.
 
 ## Use one continuous clock
@@ -33,7 +35,7 @@ Time must be complete, unique and equally spaced across the full series. The ana
 
 For example, weekly measurements can use times `0, 7, 14, 21, ...`, including when treatment begins. One AR(1) step then means seven time units. The Measurement timing output reports the inferred interval; it cannot determine whether the numeric units represent days, weeks or another unit. Without a known collection schedule, the module cannot detect that every other scheduled row has been removed.
 
-The regression uses your actual time values. Changing units changes slope units; changing the origin changes the meaning of the raw intercept and phase coefficients. The explicitly calculated endpoint differences retain their meaning when the time origin changes. These transformations should leave fitted values and residual autocorrelation unchanged, apart from numerical precision. The phase reference category is not changed by sorting. The optional coefficient table identifies its reference coding and the meaning of regression time zero; its raw phase coefficients are not automatically endpoint or onset comparisons. Custom contrast coding is retained and identified when it has no single treatment-coded reference phase.
+The regression uses your actual time values. Changing units changes slope units; changing the origin changes the meaning of the raw intercept and phase coefficients. Explicit endpoint differences retain their meaning when the time origin changes. These transformations leave fitted values and residual autocorrelation unchanged, apart from numerical precision. Simulations and unordered character labels use chronological phase order; supplied factor order and custom contrasts are retained. The optional coefficient table identifies its reference coding and the meaning of regression time zero; its raw phase coefficients are not automatically endpoint or onset comparisons.
 
 Prefer time since the series began to very large absolute timestamps. If the time coding makes the regression numerically unestimable, the analysis asks you to express time relative to the start, while retaining one continuous clock across phases.
 
@@ -51,6 +53,8 @@ Keep a row for each scheduled occasion. Fill in its time and phase, and leave th
 
 This illustrates the data format, not a sufficient sample for analysis. At least two phases are needed, each with at least two observed outcomes at different times, and there must be more than two observed outcomes per phase on average to estimate uncertainty. These are minimum requirements for estimation, not evidence that such a small sample gives reliable inference.
 
+Measurement timing reports the observed count for every phase and flags phases with fewer than five observations. This is a caution about very short series, not a guarantee of reliability once five observations are available.
+
 Missing outcomes are not imputed. Only observed outcomes contribute to estimation, but the autocorrelation uses their original scheduled positions. In this example, residual correlation between times 2 and 4 is `rho^2`, not `rho`. Correlation continues across phase boundaries. Missing time or phase values are rejected because the analysis cannot locate those observations reliably.
 
 Plots retain the chronological positions. Missing outcomes have no plotted point or fitted value; lines break at internal missing values. A missing final outcome can therefore make the visible line end before the endpoint evaluated in the comparison table. This handling does not resolve bias from informative missingness, such as measurements being omitted because symptoms were unusually severe.
@@ -59,9 +63,15 @@ Plots retain the chronological positions. Missing outcomes have no plotted point
 
 To retain the simulation controls' existing interpretation, regression time starts at 1 within each phase. The plot and AR(1) errors use a separate continuous sequence across all phases. A phase change does not reset the residual process. Endpoint comparisons evaluate each phase at the end of its own regression clock, while displayed endpoint times use the continuous measurement sequence. Simulated slopes are per measurement occasion.
 
+The **Phase-local effect** restarts in each phase. With mean 10, time effect −0.5, 20 observations per phase and zero phase effects, the expected first phase runs from 9.5 to 0 and the second restarts at 9.5. A second-phase constant effect of −10 instead continues the same decreasing line. These are unchanged simulation meanings, not a treatment-onset parameterization. Analyzing the same generated observations with a continuous clock fits the same separate phase lines, although raw intercept coefficients change meaning.
+
+Noise standard deviation zero remains available for deterministic teaching plots. Model-dependent output then explains that there is no residual variation for inference. Other fitting failures also leave the data plot available and provide an actionable error. Use distinct phase names and autocorrelation strictly between −1 and 1.
+
+New analyses spell the first default phase **Pre-treatment**. Existing saved phase names, including **Pre-treament**, are retained so explicitly selected comparisons still refer to the same phase.
+
 ## Current scope
 
-Coefficient and comparison tests and confidence intervals use the fitted GLS covariance and a t reference distribution with the number of observed outcomes minus the number of regression coefficients as degrees of freedom. Phase-estimate intervals use that same approximation. The autocorrelation interval uses a transformed normal approximation. These approximations do not establish reliable coverage in short series or with strong autocorrelation; no universal minimum number of observations guarantees reliable inference. Adding explicitly labelled phase comparisons does not resolve this separate limitation.
+Coefficient and comparison tests and confidence intervals use the fitted GLS covariance and a t reference distribution with the number of observed outcomes minus the number of regression coefficients as degrees of freedom. Phase-estimate intervals use that same approximation. The autocorrelation interval uses a transformed normal approximation; short series can underestimate autocorrelation. These approximations do not establish reliable coverage in short series or with strong autocorrelation; no universal minimum number of observations guarantees reliable inference. Adding explicitly labelled phase comparisons does not resolve this separate limitation.
 
 ## Technical reference
 

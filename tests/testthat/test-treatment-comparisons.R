@@ -301,26 +301,22 @@ test_that("phase comparison selection is explicit and rejects missing or identic
                ignore.case = TRUE)
 })
 
-test_that("repeated phase episodes cannot silently enter endpoint comparisons", {
+test_that("repeated phase episodes are rejected before fitting any pooled model", {
   data <- .treatCompFixture()
   data$stage <- factor(rep(c("A", "B", "A", "C", "D"), each = 18L))
   options <- .treatCompOptions()
-  prepared <- .treatCompPrepare(data, options)
-  fit <- .treatCompFit(prepared, options)
-  options$comparisonPhase <- "B"
-  options$referencePhase <- "A"
-  expect_error(.treatCompResults(prepared, fit, options), "repeat|contiguous|episode|phase",
-               ignore.case = TRUE)
-  expect_error(.treatCompSummary(prepared, fit, options), "repeat|contiguous|episode|phase",
-               ignore.case = TRUE)
-
-  # An unselected repeated phase does not prevent comparison of intact episodes.
+  # Even an unselected repeated phase would otherwise alter the shared fit.
   options$comparisonPhase <- "D"
   options$referencePhase <- "C"
-  result <- .treatCompResults(prepared, fit, options)
-  expect_equal(result$comparisonPhase, rep("D", 2L))
-  expect_equal(result$referencePhase, rep("C", 2L))
-  expect_true(all(is.finite(result$estimate)))
+  expect_error(.treatCompPrepare(data, options), "repeat|contiguous|episode|phase",
+               ignore.case = TRUE)
+  options$coefficientsTable <- options$autocorrelationTable <- TRUE
+  options$plotData <- options$plotAnalysis <- TRUE
+  result <- jaspTools::runAnalysis("Treatment", data, options, view = FALSE)
+  expect_identical(result$status, "validationError")
+  expect_match(result$results$errorMessage, "distinct names", fixed = TRUE)
+  expect_null(result$results$coefTable)
+  expect_null(result$results$analysisPlot)
 })
 
 test_that("a comparison-selection error preserves other valid Treatment results", {
@@ -379,10 +375,6 @@ test_that("adjacent simulated episodes sharing a label are not treated as one en
   options$inputType <- "simulateData"
   options$comparisonPhase <- "B"
   options$referencePhase <- "A"
-  prepared <- .treatCompPrepare(data, options)
-  fit <- .treatCompFit(prepared, options)
-  expect_error(.treatCompResults(prepared, fit, options), "repeat|continuous|episode|phase",
-               ignore.case = TRUE)
-  expect_error(.treatCompSummary(prepared, fit, options), "repeat|continuous|episode|phase",
+  expect_error(.treatCompPrepare(data, options), "restart|distinct|episode|phase",
                ignore.case = TRUE)
 })

@@ -9,15 +9,15 @@ Maintainer: JASP Team <info@jasp-stats.org>
 Description: Learn N=1 analyses with examples and supporting text.
 License: GPL (>= 2)
 Encoding: UTF-8
+Depends:
+  R (>= 4.1.0)
 Imports:
   dplyr,
   forecast,
   ggplot2,
   ggraph,
   jaspBase,
-  jaspDescriptives,
   jaspGraphs,
-  jaspTimeSeries,
   jsonlite,
   nlme,
   tidygraph
@@ -25,6 +25,4 @@ Suggests:
   testthat
 Remotes:
   jasp-stats/jaspBase,
-  jasp-stats/jaspDescriptives,
-  jasp-stats/jaspGraphs,
-  jasp-stats/jaspTimeSeries
+  jasp-stats/jaspGraphs

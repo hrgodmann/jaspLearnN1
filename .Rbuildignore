@@ -3,3 +3,9 @@
 ^.*\.Rproj$
 ^\.Rproj\.user$
 ^\.travis\.yml$
+^\.github$
+^\.editorconfig$
+^\.Rhistory$
+^\.DS_Store$
+(^|/)\.gitkeep$
+^learnN1dat\.csv$

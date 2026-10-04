@@ -33,7 +33,7 @@ test_that("legacy Treatment models and outputs are rebuilt with phase comparison
 
   originalUpgrade <- getFromNamespace(".ln1TreatUpgradeState", "jaspLearnN1")
   originalEstimate <- getFromNamespace(".ln1TreatEstimateModel", "jaspLearnN1")
-  for (oldVersion in list(NULL, 1L, 2L)) {
+  for (oldVersion in list(NULL, 1L, 2L, 3L)) {
     recorded <- new.env(parent = emptyenv())
     recorded$called <- FALSE
     result <- testthat::with_mocked_bindings({
@@ -47,7 +47,7 @@ test_that("legacy Treatment models and outputs are rebuilt with phase comparison
       oldData$g <- 1L
       oldData$occasion <- oldData$clock
       correlation <- if (is.null(oldVersion)) nlme::corAR1() else nlme::corAR1(form = ~ occasion)
-      oldFit <- if (identical(oldVersion, 2L)) {
+      oldFit <- if (!is.null(oldVersion) && oldVersion >= 2L) {
         nlme::gls(symptom ~ clock * stage, data = oldData, correlation = correlation,
                    method = "REML", na.action = stats::na.exclude)
       } else {
@@ -56,6 +56,7 @@ test_that("legacy Treatment models and outputs are rebuilt with phase comparison
       }
       recorded$oldPhi <- unname(stats::coef(oldFit$modelStruct$corStruct, unconstrained = FALSE))
       jaspResults[["modelState"]] <- jaspBase::createJaspState(object = oldFit)
+      jaspResults[["modelErrorState"]] <- jaspBase::createJaspState(object = "Earlier fit failure")
       jaspResults[["simulatedDataState"]] <- jaspBase::createJaspState(object = oldData)
       for (key in c("coefTable", "autoCorTable", "phaseComparisons", "phaseSummary")) {
         table <- jaspBase::createJaspTable(paste("Legacy", key))
@@ -77,7 +78,7 @@ test_that("legacy Treatment models and outputs are rebuilt with phase comparison
       }
 
       originalUpgrade(jaspResults)
-      keys <- c("simulatedDataState", "modelState", "coefTable", "autoCorTable",
+      keys <- c("simulatedDataState", "modelState", "modelErrorState", "coefTable", "autoCorTable",
                 "dataPlot", "analysisPlot", "timeInfo", "introText", "phaseComparisons", "phaseSummary")
       recorded$cleared <- vapply(keys, function(key) is.null(jaspResults[[key]]), logical(1))
       recorded$version <- jaspResults[["treatmentTimeVersion"]]$object
@@ -96,9 +97,9 @@ test_that("legacy Treatment models and outputs are rebuilt with phase comparison
 
     expect_true(recorded$called)
     expect_true(all(recorded$cleared))
-    expect_identical(recorded$version, 3L)
+    expect_identical(recorded$version, 4L)
     expect_true(recorded$idempotent)
-    expect_identical(recorded$secondVersion, 3L)
+    expect_identical(recorded$secondVersion, 4L)
     expect_identical(result$status, "complete")
     expect_s3_class(recorded$rebuilt, "gls")
     expect_null(recorded$rebuilt$modelStruct$reStruct)

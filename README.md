@@ -8,7 +8,7 @@ The JASP Learn N=1 module is an add-on module for JASP that introduces single-su
 
 The module relies on several R packages for its statistical computations:
 
-- **nlme** — Linear mixed-effects models with AR(1) correlation for treatment evaluation ([nlme on CRAN](https://cran.r-project.org/package=nlme))
+- **nlme** — Generalized least squares (GLS) with AR(1) residual correlation for treatment evaluation ([nlme on CRAN](https://cran.r-project.org/package=nlme))
 - **forecast** — Automatic ARIMA model selection and forecasting ([forecast on CRAN](https://cran.r-project.org/package=forecast))
 - **tidygraph** / **ggraph** — Network construction and visualization ([tidygraph on CRAN](https://cran.r-project.org/package=tidygraph), [ggraph on CRAN](https://cran.r-project.org/package=ggraph))
 
@@ -25,7 +25,7 @@ The organization of the analyses within the Learn N=1 module in JASP is as follo
 
 ## Key Features
 
-**Does The Treatment Work?** Evaluates treatment effects using an interrupted time series design. Fits a linear mixed-effects model with phase-by-time interactions and AR(1) residual correlation to test whether symptom levels and trends changed across treatment phases (e.g., pre-treatment, treatment, post-treatment).
+**Does The Treatment Work?** Describes phase-associated changes in a single person's time series. Fits generalized least squares with phase-by-time interactions and AR(1) residual correlation, estimated by REML. Users can compare each phase at its own endpoint and compare phase slopes. Confidence intervals and p-values are approximate, particularly in short series; these comparisons alone do not establish a causal treatment effect.
 
 **How Do Symptoms Develop?** Models the temporal dynamics of symptoms using ARIMA models. Automatically selects the best-fitting ARIMA specification via `forecast::auto.arima` and supports forecasting future symptom trajectories with configurable forecast horizons and visualization options.
 

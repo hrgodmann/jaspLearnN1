@@ -274,6 +274,7 @@ test_that("legacy network caches are rebuilt with previously hidden isolated nod
   }, .ln1NetUpgradeState = function(jaspResults) {
     # Native constructors are valid here because runAnalysis initialized JASP.
     recorded$called <- TRUE
+    jaspResults[["introText"]] <- jaspBase::createJaspHtml("Old interpretation")
     jaspResults[["nodeAttributesState"]] <- jaspBase::createJaspState(nodes)
     edgelists <- jaspBase::createJaspContainer()
     edgelists[["Time 1"]] <- jaspBase::createJaspState(edges)
@@ -303,7 +304,7 @@ test_that("legacy network caches are rebuilt with previously hidden isolated nod
     jaspResults[["networkNodesVersion"]] <- NULL
 
     originalUpgrade(jaspResults)
-    keys <- c("nodeAttributesState", "edgelistContainer", "centralityContainer",
+    keys <- c("introText", "nodeAttributesState", "edgelistContainer", "centralityContainer",
               "centralityTableContainer", "edgeWeightTableContainer", "networkPlotContainer")
     recorded$cleared <- vapply(keys, function(key) is.null(jaspResults[[key]]), logical(1))
     recorded$exportPreserved <- !is.null(jaspResults[["networkSavePath"]])
@@ -317,7 +318,7 @@ test_that("legacy network caches are rebuilt with previously hidden isolated nod
   expect_true(recorded$called)
   expect_true(all(recorded$cleared))
   expect_true(recorded$exportPreserved)
-  expect_identical(recorded$version, 4L)
+  expect_identical(recorded$version, 5L)
   expect_true(recorded$idempotent)
   expect_identical(result$status, "complete")
   graph <- .netNodesExpectPlot(result, options)
@@ -373,7 +374,7 @@ test_that("version-two caches rebuild for scales without rewriting existing expo
   expect_true(recorded$preserved[["networkSavePath"]])
   expect_false(any(recorded$preserved[setdiff(names(recorded$preserved), "networkSavePath")]))
   expect_identical(recorded$savedState, list(saved = TRUE))
-  expect_identical(recorded$version, 4L)
+  expect_identical(recorded$version, 5L)
   expect_true(recorded$currentPlotPreserved)
   expect_identical(result$status, "complete")
   graph <- .netNodesExpectPlot(result, options)

@@ -153,6 +153,7 @@ test_that("simulated phase-local regression time has continuous AR1 chronology",
   expect_equal(prepared[[timing$occasion]], seq_len(120L))
   actual <- .treatTimeFit(prepared, options)
   referenceData <- data
+  referenceData$phase <- factor(referenceData$phase, levels = unique(referenceData$phase))
   reference <- nlme::gls(y ~ time * phase, data = referenceData, method = "REML",
                          correlation = nlme::corAR1(form = ~ t),
                          na.action = stats::na.exclude)

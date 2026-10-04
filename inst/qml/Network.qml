@@ -29,7 +29,8 @@ Form
 {
 	id: networkForm
     property string actionError: ""
-    property var builtInPresets: Presets.builtInPresets()
+    property var builtInPresets: presetLists.builtInPresets()
+    Common.NetworkPresetLists { id: presetLists }
 
     function presetChoices() {
         return builtInPresets.map(function(item) { return {label: item.label, value: item.id} })
@@ -238,7 +239,7 @@ Form
         title: qsTr("Symptom presets")
         info: qsTr("Presets save reusable problem definitions and rating scales. They exclude severity ratings, connections, assessment results and CSV destinations.")
         Label {
-            text: Presets.builtInNotice()
+            text: presetLists.builtInNotice()
             textFormat: Text.PlainText
             wrapMode: Text.WordWrap
             Layout.preferredWidth: 400 * preferencesModel.uiScale
@@ -369,13 +370,13 @@ Form
 		title: qsTr("Problems")
 		minimumItems: 2
 		maximumItems: 10
-		headerLabels: [qsTr("Name"), qsTr("Severity")]
+		headerLabels: [qsTr("Name"), qsTr("Shared severity")]
 		defaultValues: [
 			{"problemName": qsTr("Problem 1"), "problemSeverity": 0, "problemSeverityRated": false},
 			{"problemName": qsTr("Problem 2"), "problemSeverity": 0, "problemSeverityRated": false},
 			{"problemName": qsTr("Problem 3"), "problemSeverity": 0, "problemSeverityRated": false}
 		]
-		info: qsTr("Define the problems and rate their severity on the selected scale. Confirm each rating, including zero. Every selected problem remains in the network, including problems without connections.")
+		info: qsTr("Define problems and confirm each severity rating, including zero. Severity is shared across all assessment tabs. Unconnected problems remain visible.")
 
 		rowComponent: RowLayout
 		{
@@ -391,7 +392,7 @@ Form
                     value: ""
                     placeholderText: qsTr("Optional definition")
                     fieldWidth: 150 * preferencesModel.uiScale
-                    info: qsTr("Describe what this problem means for this person. Definitions are included in symptom presets; avoid personal details in presets you intend to share.")
+                    info: qsTr("Define what this problem means. Definitions enter reusable presets; avoid personal details before sharing.")
                 }
             }
 
@@ -432,9 +433,9 @@ Form
 		name: "connectionList"
 		// title: qsTr("Problem Connections")
 		maximumItems: 10
-		newItemName: qsTr("Time ") + (connectionList.count + 1)
+		newItemName: qsTr("Time %1").arg(connectionList.count + 1)
 		optionKey: "name"
-		info: qsTr("Each tab represents an assessment occasion. Use its name to identify the occasion or reference period. Rate all connections within a tab for the same period and context.")
+		info: qsTr("Name each assessment for its occasion or reference period. Rate its connections for the same period and context.")
 		content: Group
 		{
 			childControlsArea.anchors.leftMargin: jaspTheme.contentMargin
@@ -612,7 +613,7 @@ Form
 					name: "centrality"
 					label: qsTr("Connection summaries")
 					checked: false
-					info: qsTr("Shows severity separately from incoming and outgoing connections. For each direction, absolute strength sums the magnitudes of the ratings, while signed sum retains their positive or negative signs. Opposite signs can cancel in the signed sum. These summaries describe perceived connections and do not determine treatment priorities.")
+					info: qsTr("Show shared severity, absolute strength and signed sums. Opposite signs can cancel. These descriptive summaries do not determine treatment priorities.")
 				}
 
 				CheckBox
@@ -641,7 +642,7 @@ Form
 		label:	qsTr("CSV destination")
 		filter:	"*.csv"
 		save:	true
-		info:	qsTr("Choose a destination for the CSV. Selecting a destination or editing the network does not write a file. Press Export CSV / Save again to export completed assessments. The Network export status names exported and omitted assessments. Problems without connections and completed empty assessments are included. If no assessments are complete, no file is written.")
+		info:	qsTr("Choose a destination, then press Export CSV / Save again. Only that button writes the file. The export status identifies completed and omitted assessments.")
 	}
 
 	Button

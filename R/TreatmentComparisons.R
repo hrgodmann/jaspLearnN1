@@ -12,14 +12,14 @@
       all(colSums(coding) == 1) && sum(rowSums(coding) == 0) == 1L &&
       all(rowSums(coding) %in% c(0, 1))) {
     reference <- rownames(coding)[rowSums(coding) == 0]
-    table$addFootnote(gettextf("Coefficient reference phase: %s. The intercept is its fitted outcome at regression time 0. Phase coefficients are differences from this reference at regression time 0; interactions are slope differences. These are not automatically endpoint or treatment-onset comparisons.", reference))
+    table$addFootnote(gettextf("Coefficient reference phase: %1$s. The intercept is its fitted outcome at regression time 0. Phase coefficients are differences from this reference at regression time 0; interactions are slope differences. These are not automatically endpoint or treatment-onset comparisons.", reference))
   } else {
     table$addFootnote(gettext("Phase coefficients use contrast coding without a single treatment-coded reference phase. Use Phase comparisons for explicitly named endpoint and slope differences."))
   }
   if (options[["inputType"]] == "simulateData") {
     table$addFootnote(gettext("Simulation regression time starts at 1 in each phase, so regression time 0 is one occasion before each phase's own first measurement."))
   } else {
-    table$addFootnote(gettextf("Regression time 0 means %s = 0 in the selected time variable. The supplied time origin is retained.", decodeColNames(options[["time"]])))
+    table$addFootnote(gettextf("Regression time 0 means %1$s = 0 in the selected time variable. The supplied time origin is retained.", decodeColNames(options[["time"]])))
   }
 }
 
@@ -28,7 +28,7 @@
   phase <- dataset[[variables[["phase"]]]]
   phaseNames <- unique(as.character(phase))
   indices <- lapply(phaseNames, function(name) which(as.character(phase) == name))
-  ends <- vapply(indices, function(i) tail(i, 1L), integer(1))
+  ends <- vapply(indices, function(i) utils::tail(i, 1L), integer(1))
   starts <- vapply(indices, function(i) i[1L], integer(1))
   runs <- rle(as.character(phase))$values
   episodes <- vapply(phaseNames, function(name) sum(runs == name), integer(1))
@@ -132,7 +132,7 @@
     table$addColumnInfo(name = "t", title = gettext("t"), type = "number")
     table$addColumnInfo(name = "p", title = gettext("p"), type = "pvalue")
   }
-  overtitle <- gettextf("%.0f%% CI", 100 * options[["coefficientCiLevel"]])
+  overtitle <- .ln1TreatCiTitle(options)
   table$addColumnInfo(name = "lower", title = gettext("Lower"), type = "number", overtitle = overtitle)
   table$addColumnInfo(name = "upper", title = gettext("Upper"), type = "number", overtitle = overtitle)
 }
@@ -148,7 +148,7 @@
   .ln1TreatAddEstimateColumns(table, options, tests = TRUE)
   .ln1TreatComparisonFootnotes(table, options)
   table$addFootnote(gettext("Differences are compared phase minus reference phase. A negative endpoint difference means a lower fitted outcome; whether this represents improvement depends on the outcome scale. The two p-values are unadjusted tests of different questions, not a single test of treatment success."))
-  if (ready && !is.null(jaspResults[["modelState"]])) {
+  if (ready && !.ln1TreatSetModelError(table, jaspResults) && !is.null(jaspResults[["modelState"]])) {
     tryCatch({
       results <- .ln1TreatComparisonResults(dataset, jaspResults[["modelState"]]$object, options)
       table$addFootnote(gettextf("Endpoint times: %1$s = %2$s; %3$s = %4$s (chronological time).",
@@ -172,7 +172,7 @@
   table$addColumnInfo(name = "quantity", title = gettext("Quantity"), type = "string")
   .ln1TreatAddEstimateColumns(table, options, tests = FALSE)
   .ln1TreatComparisonFootnotes(table, options)
-  if (ready && !is.null(jaspResults[["modelState"]])) {
+  if (ready && !.ln1TreatSetModelError(table, jaspResults) && !is.null(jaspResults[["modelState"]])) {
     tryCatch({
       results <- .ln1TreatPhaseSummaries(dataset, jaspResults[["modelState"]]$object, options)
       results[["quantity"]] <- rep(c(gettext("Fitted endpoint"), gettext("Slope")), nrow(results) / 2L)

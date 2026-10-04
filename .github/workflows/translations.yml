@@ -12,8 +12,8 @@ jobs:
     env:
       REPO_KEY: ${{ secrets.REPOS_KEY }}
       WEBLATE_KEY: ${{ secrets.WEBLATE_KEY }}
-      QML_REPO: jasptestmodule-qml
-      R_REPO: jasttestmodule-r
+      QML_REPO: jasplearnn1-qml
+      R_REPO: jasplearnn1-r
 
     steps:
       - uses: jasp-stats/jasp-actions/wlcLock@master

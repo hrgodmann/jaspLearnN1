@@ -64,7 +64,7 @@ Form
 				title:			qsTr("Time")
 				allowedColumns:	["scale"]
 				singleVariable:	true
-				info:			qsTr("A continuous numeric time variable across all phases. Values must be complete, unique and equally spaced; rows are sorted by time. Do not restart time at each phase. Keep a row for every missing measurement occasion. The selected values also define the time scale of the regression trends.")
+				info:			qsTr("Use one equally spaced numeric clock across all phases. Keep time and phase filled in for missing outcomes. Rows are sorted by time.")
 			}
 			AssignedVariablesList
 			{
@@ -72,7 +72,7 @@ Form
 				title:			qsTr("Phase Variable")
 				allowedColumns:	["nominal"]
 				singleVariable:	true
-				info:			qsTr("A categorical variable indicating the treatment phase (e.g., pre-treatment, treatment, post-treatment). Every row needs a phase, including missing outcomes. Autocorrelation continues across phase boundaries.")
+				info:			qsTr("Give each continuous phase a distinct label, such as Baseline 1, Treatment, and Baseline 2. Fill in phase labels even for missing outcomes.")
 			}
 		}
 
@@ -94,7 +94,7 @@ Form
 					DoubleField
 					{
 						name: "simDependentMean"
-						label: "Mean"
+						label: qsTr("Mean")
 						defaultValue: 0.0
 						info: qsTr("The mean of the dependent variable before adding phase and time effects.")
 					}
@@ -102,9 +102,10 @@ Form
 					DoubleField
 					{
 						name: "simDependentSd"
-						label: "Standard deviation"
+						label: qsTr("Standard deviation")
 						defaultValue: 1.0
-						info: qsTr("The standard deviation of the noise added to the simulated data.")
+						min: 0
+						info: qsTr("Noise standard deviation. Zero shows a deterministic series in the data plot; model inference requires residual variation.")
 					}
 				}
 
@@ -116,10 +117,10 @@ Form
 					DoubleField
 					{
 						name: "simTimeEffect"
-						label: qsTr("Effect")
+						label: qsTr("Phase-local effect")
 						defaultValue: 0.0
 						negativeValues: true
-						info: qsTr("The linear effect of time on the dependent variable. In simulations, regression time starts at 1 within each phase; autocorrelation uses a continuous sequence across all phases.")
+						info: qsTr("The trend restarts at time 1 in each phase. A nonzero trend can therefore create a jump even when phase effects are zero. Autocorrelation remains continuous.")
 					}
 
 					DoubleField
@@ -129,8 +130,9 @@ Form
 						defaultValue: 0
 						min: -1
 						max: 1
+						inclusive: JASP.None
 						negativeValues: true
-						info: qsTr("The first-order autocorrelation of the noise process. Values range from -1 to 1.")
+						info: qsTr("The first-order correlation of the noise. Values must be strictly between -1 and 1.")
 					}
 				}
 			}
@@ -140,6 +142,7 @@ Form
 				name: "seed"
 				label: qsTr("Seed")
 				defaultValue: 1
+				min: 0
 				info: qsTr("Sets the random number generator seed for reproducible simulations.")
 			}
 
@@ -153,11 +156,11 @@ Form
 					id: simPhaseEffects
 					name: "simPhaseEffects"
 					preferredWidth: sectionData.width - 8 * jaspTheme.contentMargin
-					minimumItems: 1
+					minimumItems: 2
 					headerLabels: [qsTr("Name"), qsTr("Phase"), qsTr("Phase × Time"), qsTr("Time points")]
 					info: qsTr("Each row defines a treatment phase with its name, effect on the dependent variable, interaction with time, and number of time points.")
 					defaultValues: [
-						{"simPhaseName": "Pre-treament", "simPhaseEffectSimple": 0.0, "simPhaseEffectInteraction": 0.0, "simPhaseEffectN": 20},
+						{"simPhaseName": "Pre-treatment", "simPhaseEffectSimple": 0.0, "simPhaseEffectInteraction": 0.0, "simPhaseEffectN": 20},
 						{"simPhaseName": "Treatment", "simPhaseEffectSimple": 5.0, "simPhaseEffectInteraction": 0.0, "simPhaseEffectN": 20},
 						{"simPhaseName": "Post-treatment", "simPhaseEffectSimple": 5.0, "simPhaseEffectInteraction": -0.1, "simPhaseEffectN": 20}
 					]
@@ -170,7 +173,7 @@ Form
 						TextField
 						{
 							name: "simPhaseName"
-							defaultValue: qsTr("Phase ") + (rowIndex + 1)
+							defaultValue: qsTr("Phase %1").arg(rowIndex + 1)
 							info: qsTr("The name of this treatment phase.")
 						}
 
@@ -194,7 +197,8 @@ Form
 						{
 							name: "simPhaseEffectN"
 							defaultValue: 20
-							info: qsTr("The number of time points in this phase.")
+							min: 2
+							info: qsTr("At least two time points per phase are needed to estimate trends; uncertainty needs more than two per phase on average. These are estimation limits, not reliable-inference guarantees.")
 						}
 					}
 				}
@@ -215,7 +219,7 @@ Form
 			name: "phaseComparisons"
 			label: qsTr("Compare phase endpoints and slopes")
 			checked: true
-			info: qsTr("Reports the comparison phase minus the reference phase for fitted endpoint levels and slopes. Each endpoint is evaluated at that phase's own last scheduled time, including a scheduled time with a missing outcome; this is not a change at treatment onset. Slopes describe change per unit of forward time. Confidence intervals and p-values use approximate inference from the AR(1) model estimated by REML and may be unreliable in short series or with strong autocorrelation.")
+			info: qsTr("Compare each phase's own endpoint and its forward trend. Endpoint differences concern two different times, not treatment-onset change. Approximate tests do not identify what caused a difference.")
 
 			DropDown
 			{

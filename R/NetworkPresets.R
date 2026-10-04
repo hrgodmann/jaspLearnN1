@@ -6,7 +6,11 @@
     (!nonempty || nzchar(value))
 }
 
-.ln1NetPresetTrim <- function(value) trimws(value, whitespace = "[\\h\\v]")
+# Explicit cross-runtime contract, including NEL, Mongolian vowel separator and
+# BOM. Keep identical to _trimPresetText in NetworkPresetData.js and its fixtures.
+.ln1NetPresetTrim <- function(value) {
+  trimws(value, whitespace = "[\u0009-\u000d\u0020\u0085\u00a0\u1680\u180e\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]")
+}
 
 .ln1NetPresetObject <- function(value, allowed) {
   is.list(value) && !is.null(names(value)) &&
@@ -205,12 +209,11 @@
   if (!current) {
     previous <- record
     record <- list(version = 1L, session = session, observedRequest = observedRequest,
-                   request = request, status = "pending", lastAttempt = NULL)
+                   request = request, status = "pending")
     # The bound button is reset to FALSE during QML initialization, before R
     # dispatch. In a fresh session TRUE is therefore the first explicit click.
     clicked <- hasSession && observedRequest
     if (is.list(previous) && identical(previous[["version"]], 1L)) {
-      record[["lastAttempt"]] <- previous[["lastAttempt"]]
       if (identical(previous[["request"]], request)) {
         record[["status"]] <- previous[["status"]]
         record[["error"]] <- previous[["error"]]
@@ -233,8 +236,8 @@
                        error = function(e) conditionMessage(e), warning = function(w) conditionMessage(w))
     record[["status"]] <- if (is.null(error)) "success" else "failed"
     record[["error"]] <- error
-    record[["lastAttempt"]] <- record[c("request", "status", "error")]
   }
+  record[["lastAttempt"]] <- NULL
   # An event journal must survive data/path changes and path clearing. Giving
   # it automatic option dependencies could replay an already consumed click.
   jaspResults[["networkPresetSaveState"]] <- createJaspState(object = record)

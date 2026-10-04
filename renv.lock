@@ -3615,44 +3615,6 @@
       "RemoteSha": "0f0f59e18f5524ea422cb3dc5ad76ace6f0518e4",
       "Remotes": "jasp-stats/jaspGraphs"
     },
-    "jaspDescriptives": {
-      "Package": "jaspDescriptives",
-      "Version": "0.95.0",
-      "Source": "GitHub",
-      "Type": "Package",
-      "Title": "Descriptives Module for JASP",
-      "Date": "2022-09-12",
-      "Author": "JASP Team",
-      "Website": "jasp-stats.org",
-      "Maintainer": "JASP Team <info@jasp-stats.org>",
-      "Description": "Explore the data with tables and plots",
-      "License": "GPL (>= 2)",
-      "Encoding": "UTF-8",
-      "Imports": [
-        "ggplot2",
-        "ggrepel",
-        "jaspBase",
-        "jaspGraphs",
-        "jaspTTests",
-        "forecast",
-        "flexplot",
-        "ggrain",
-        "ggpp",
-        "ggtext",
-        "dplyr",
-        "tidyplots",
-        "ggpubr",
-        "forcats",
-        "patchwork"
-      ],
-      "RemoteType": "github",
-      "RemoteHost": "api.github.com",
-      "RemoteUsername": "jasp-stats",
-      "RemoteRepo": "jaspDescriptives",
-      "RemoteRef": "master",
-      "RemoteSha": "645749bd87c87a3d19c6bc71e734b46dbe9e5247",
-      "Remotes": "jasp-stats/jaspBase, jasp-stats/jaspGraphs, jasp-stats/jaspTTests, dustinfife/flexplot"
-    },
     "jaspGraphs": {
       "Package": "jaspGraphs",
       "Version": "0.20.0",
@@ -3718,37 +3680,6 @@
       "RemoteRef": "master",
       "RemoteSha": "2e65ee0e61f6815cd915368bbbe7ebefeb8bff66",
       "Remotes": "jasp-stats/jaspBase, jasp-stats/jaspGraphs"
-    },
-    "jaspTimeSeries": {
-      "Package": "jaspTimeSeries",
-      "Version": "0.95.0",
-      "Source": "GitHub",
-      "Type": "Package",
-      "Title": "A Time Series module for JASP",
-      "Date": "2023-06-23",
-      "Author": "Sophie Berkhout",
-      "Website": "https://sophieberkhout.github.io/",
-      "Maintainer": "Sophie Berkhout <s.w.berkhout@uu.nl>",
-      "Description": "This module offers time series analyses.",
-      "License": "GPL (>= 2)",
-      "Encoding": "UTF-8",
-      "Imports": [
-        "jaspBase",
-        "jaspGraphs",
-        "jaspDescriptives",
-        "forecast",
-        "lubridate"
-      ],
-      "Suggests": [
-        "testthat"
-      ],
-      "RemoteType": "github",
-      "RemoteHost": "api.github.com",
-      "RemoteUsername": "jasp-stats",
-      "RemoteRepo": "jaspTimeSeries",
-      "RemoteRef": "master",
-      "RemoteSha": "03b1faca627b919ae0d072cf56cd8f4367c13996",
-      "Remotes": "jasp-stats/jaspBase, jasp-stats/jaspGraphs, jasp-stats/jaspDescriptives"
     },
     "jaspTools": {
       "Package": "jaspTools",

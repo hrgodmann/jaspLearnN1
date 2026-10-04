@@ -407,6 +407,8 @@ test_that("forecast table plot and CSV share the same conditional predictions", 
   options$forecastTimeSeries <- TRUE
   options$forecastTimeSeriesType <- "both"
   options$forecastSave <- tempfile(fileext = ".csv")
+  options$forecastExportSession <- "native-forecast-covariates"
+  options$forecastExportRequest <- TRUE # First explicit click after QML resets FALSE.
   on.exit(unlink(options$forecastSave), add = TRUE)
   result <- .foreCovRun(data, options)
   expect_identical(result$status, "complete")
@@ -457,6 +459,8 @@ test_that("an unavailable export location preserves the fitted and forecast tabl
   options$forecastLength <- 2L
   options$forecastTable <- TRUE
   options$forecastSave <- file.path(tempfile("missing-forecast-directory-"), "forecasts.csv")
+  options$forecastExportSession <- "native-forecast-covariates"
+  options$forecastExportRequest <- TRUE
   result <- .foreCovRun(data, options)
   expect_identical(result$status, "complete")
   expect_identical(result$results$coefTable$status, "complete")

@@ -16,15 +16,13 @@
 #
 
 .ln1ForeUpgradeState <- function(jaspResults) {
-  version <- 2L
+  version <- 3L
   marker <- jaspResults[["forecastCacheVersion"]]
   if (!is.null(marker) && identical(marker$object, version))
     return(invisible(NULL))
 
-  # Earlier releases cached outcome-only fits and stored forecasts directly as
-  # data frames. Rebuild their states and displayed results together; adapting
-  # only the forecast state would leave an old coefficient table visible.
-  # Version 2 also revalidates cached future timing with scale-aware tolerances.
+  # Rebuild earlier calculation/output formats together, including corrected
+  # simulated lengths and the current coefficient and prediction explanations.
   keys <- c("dataState", "modelState", "forecastResult", "coefTable",
             "dataPlot", "forecastPlot", "forecastTable", "forecastExport",
             "introText")
@@ -45,13 +43,28 @@
   return(decodeColNames(options[["dependent"]]))
 }
 
-.ln1ForeModelNote <- function(fit) {
+.ln1ForeModelNote <- function(fit, options = list()) {
   order <- fit[["arma"]]
   if (any(order[c(3, 4, 7)] > 0))
-    return(gettextf("An ARIMA(%1$s, %2$s, %3$s)(%4$s, %5$s, %6$s)[%7$s] model was fitted.",
-      order[1], order[6], order[2], order[3], order[7], order[4], order[5]))
-  return(gettextf("An ARIMA(%1$s, %2$s, %3$s) model was fitted.",
-    order[1], order[6], order[2]))
+    note <- gettextf("An ARIMA(%1$s, %2$s, %3$s)(%4$s, %5$s, %6$s)[%7$s] model was fitted.",
+      order[1], order[6], order[2], order[3], order[7], order[4], order[5])
+  else
+    note <- gettextf("An ARIMA(%1$s, %2$s, %3$s) model was fitted.", order[1], order[6], order[2])
+  coefficients <- names(fit[["coef"]])
+  if ("drift" %in% coefficients)
+    note <- paste(note, gettext("A linear drift term was included."))
+  else if ("intercept" %in% coefficients)
+    note <- paste(note, if (length(.ln1ForeCovariates(options)))
+      gettext("A regression intercept was included.") else gettext("A process mean was estimated."))
+  else
+    note <- paste(note, gettext("No mean or drift term was included."))
+  if (identical(options[["modelSpecification"]], "auto")) {
+    criterion <- options[["modelSpecificationAutoIc"]]
+    if (is.null(criterion) || !nzchar(criterion)) criterion <- "aicc"
+    label <- switch(criterion, aicc = "AICc", aic = "AIC", bic = "BIC", "AICc")
+    note <- paste(note, gettextf("Automatic selection used %1$s, with KPSS tests as the default differencing rule.", label))
+  }
+  return(note)
 }
 
 .ln1ForeCoefficientRows <- function(fit, options) {
@@ -84,7 +97,7 @@
   for (i in seq_along(coefficientNames)) {
     name <- coefficientNames[i]
     if (name == "intercept") {
-      labels[i] <- gettext("Intercept")
+      labels[i] <- if (length(covariates)) gettext("Intercept") else gettext("Mean")
     } else if (name == "drift") {
       labels[i] <- gettext("Drift")
     } else if (grepl("^ar[0-9]+$", name)) {
@@ -132,7 +145,7 @@
   level <- options[["coefficientCiLevel"]]
   if (is.null(level))
     level <- 0.95
-  overtitle <- gettextf("%s%% CI", 100 * level)
+  overtitle <- gettextf("%1$s%% CI", 100 * level)
   table$addColumnInfo(name = "lower", title = gettext("Lower"), type = "number", overtitle = overtitle)
   table$addColumnInfo(name = "upper", title = gettext("Upper"), type = "number", overtitle = overtitle)
   jaspResults[["coefTable"]] <- table
@@ -152,15 +165,17 @@
     if (fit[["nobs"]] <= length(fit[["coef"]]))
       table$addFootnote(gettext("There are too few observations to compute coefficient p-values and confidence intervals."))
   }
-  table$addFootnote(.ln1ForeModelNote(fit))
+  table$addFootnote(.ln1ForeModelNote(fit, options))
+  table$addFootnote(gettext("Coefficient p-values and confidence intervals use an approximate t reference with the number of used observations minus the number of coefficients as degrees of freedom. This is not a validated small-sample correction; results condition on the fitted model."))
   if (length(.ln1ForeCovariates(options)))
     table$addFootnote(gettext("Covariate coefficients describe associations with the outcome, accounting for the other selected covariates and ARIMA errors. They do not establish causal effects."))
 }
 
 .ln1ForePredictionNote <- function(options) {
+  note <- gettext("Prediction intervals describe future observations under the fitted model. They omit uncertainty in parameter estimates and model selection.")
   if (length(.ln1ForeCovariates(options)))
-    return(gettext("Forecasts and prediction intervals are conditional on the supplied future covariate values. Uncertainty in these covariate values is not included."))
-  return(gettext("Prediction intervals describe uncertainty about future observations."))
+    note <- paste(note, gettext("They are conditional on the supplied future covariate values and omit uncertainty in those values."))
+  return(note)
 }
 
 .ln1ForeCreateForecastOutputs <- function(jaspResults, dataset, fit, options, ready) {
@@ -172,7 +187,9 @@
     return()
 
   dependencies <- c(.ln1ForeGetDataDependencies(), "forecastLength")
-  hasForecast <- ready && options[["forecastLength"]] > 0
+  # Zero means no request. Other values, including invalid saved/programmatic
+  # values, reach the guarded helper for an actionable forecast-specific error.
+  hasForecast <- ready && !isTRUE(options[["forecastLength"]] == 0)
   result <- NULL
   if (hasForecast) {
     if (is.null(jaspResults[["forecastResult"]])) {
@@ -208,7 +225,7 @@
     table$addColumnInfo(name = "t", title = gettext("Time"), type = "string")
     table$addColumnInfo(name = "y", title = .ln1ForeOutcomeLabel(options), type = "number")
     for (level in c(80, 95)) {
-      overtitle <- gettextf("%s%% prediction interval", level)
+      overtitle <- gettextf("%1$s%% prediction interval", level)
       table$addColumnInfo(name = paste0("lower", level), title = gettext("Lower"), type = "number", overtitle = overtitle)
       table$addColumnInfo(name = paste0("upper", level), title = gettext("Upper"), type = "number", overtitle = overtitle)
     }
@@ -226,24 +243,7 @@
     }
   }
 
-  if (wantSave && hasForecast) {
-    message <- result[["error"]]
-    if (is.null(message)) {
-      exported <- result[["predictions"]]
-      names(exported)[names(exported) == "y"] <- .ln1ForeOutcomeLabel(options)
-      error <- tryCatch({
-        utils::write.csv(exported, file = path, row.names = FALSE)
-        NULL
-      }, error = function(e) e, warning = function(w) w)
-      message <- if (is.null(error)) gettext("Forecasts saved.") else
-        gettext("The forecasts could not be saved. Choose a writable CSV file location.")
-    }
-    # HTML nodes do not serialize setError() in all supported JASP versions.
-    # Report the actual write outcome in their text, after attempting the write.
-    status <- createJaspHtml(message, title = gettext("Forecast export"), position = 5)
-    status$dependOn(c(dependencies, "forecastSave"))
-    jaspResults[["forecastExport"]] <- status
-  }
+  return(result)
 }
 
 .ln1ForeForecastPlotFill <- function(dataset, predictions, options) {

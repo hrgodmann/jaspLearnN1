@@ -39,22 +39,15 @@ Network <- function(jaspResults, dataset = NULL, options) {
 }
 
 .ln1NetIntroText <- function() {
-  return(gettext("PECAN (Perceived Causal Networks) is an approach used to map how individuals believe their symptoms, emotions, and behaviors influence one another. Instead of relying purely on statistical relationships, PECAN focuses on a client’s (or their therapists) own perception of causal connections within their psychological system. In clinical practice, PECAN can help make these perceived relationships explicit and structured. For example, a client may believe that poor sleep leads to increased anxiety, which in turn leads to avoidance behavior. By visualizing such connections, therapists and clients can gain insight into how problems are maintained and identify potential targets for intervention. 
-
-<b>How does it work?</b> 
-
-PECAN is typically based on self-reported data, where clients indicate how strongly they believe different variables influence each other. These variables can include symptoms (e.g., anxiety, mood), behaviors (e.g., avoidance), or contextual factors (e.g., stress). The result is a network structure in which nodes represent variables and connections represent perceived causal effects. Unlike purely data-driven models, PECAN captures subjective beliefs about causality. This makes it especially useful in therapy, as these beliefs often guide behavior and coping strategies. By mapping them, therapists can work together with clients to evaluate whether certain perceived relationships are helpful, accurate, or potentially maladaptive.
-PECAN can also be combined with time series data, allowing a comparison between perceived relationships and statistically estimated relationships (e.g., from VAR models). This can reveal discrepancies between what a client believes and what is observed in their data.
-
-<b>Practical considerations</b> 
-
-PECAN relies on the client’s insight and ability to reflect on their own experiences. As such, the quality of the network depends on how well the client can articulate perceived relationships. It may be helpful to guide clients through the process using structured prompts or examples. Because PECAN reflects subjective beliefs, it does not require large amounts of repeated measurements. However, it can be enriched by integrating it with longitudinal data, especially when used alongside other analytical approaches. 
-
-<b>Interpretation and limitations</b> 
-
-It is important to recognize that PECAN represents perceived causality, not necessarily actual causal mechanisms. Clients’ (and therapists’) beliefs may be incomplete, biased, or influenced by current mood or recent experiences. Nevertheless, these perceptions are clinically meaningful, as they can shape behavior and emotional responses. PECAN should therefore be used as a tool for discussion and hypothesis generation, rather than as definitive evidence about causal processes. When combined with other methods—such as forecasting or VAR models—it can provide a more comprehensive understanding of both subjective experience and observed dynamics.
-"))
-} 
+  paste(
+    gettext("This PECAN-inspired analysis maps how a person or their therapist believes problems influence one another. Use it to make perceived relationships explicit and support collaborative case formulation."),
+    gettext("<b>Enter problems and connections</b><br>Define each problem, record its severity, and name each assessment for its reference period. Severity is shared across all assessments. Connections can differ between assessments."),
+    gettext("<b>Read signed ratings</b><br>A positive connection means that an increase in the source problem is perceived to increase the target; a negative connection means it decreases the target. The meaning depends on how both problems are defined. Rate perceived strength, not certainty; zero means no perceived relationship."),
+    gettext("<b>Use the summaries</b><br>Absolute strength adds connection magnitudes; signed sums retain direction and can cancel. Severity is shown separately and does not weight these sums. This variant does not reproduce the original PECAN causal-allocation protocol or its severity-weighted score."),
+    gettext("<b>Interpret with the person</b><br>These ratings describe perceived relationships, not established causal effects. Consider individual connections, severity, the person's priorities and the feasibility of change when discussing possible treatment targets. The summaries do not predict treatment benefit or determine priorities."),
+    sep = "\n\n"
+  )
+}
 
 
 .ln1NetGetDataDependencies <- function() {
@@ -62,14 +55,22 @@ It is important to recognize that PECAN represents perceived causality, not nece
            "networkConnectionMaximum", "networkConnectionCounts"))
 }
 
-.ln1NetData <- function(jaspResults, dataset, options) {
-  nodeAttributes <- data.frame(
-    name = vapply(options[["problems"]], `[[`, character(1), "problemName"),
-    strength = vapply(options[["problems"]], .ln1NetSeverityValue, numeric(1)),
-    stringsAsFactors = FALSE
-  )
+.ln1NetPlotDependencies <- function() {
+  c("plotLayout", "colorPalette", "plotSeverityFill", "plotSeveritySize", "plotSeverityAlpha",
+    "plotStrengthColor", "plotStrengthWidth", "plotStrengthAlpha")
+}
 
-  jaspResults[["nodeAttributesState"]] <- createJaspState(nodeAttributes)
+.ln1NetData <- function(jaspResults, dataset, options) {
+  if (is.null(jaspResults[["nodeAttributesState"]])) {
+    nodeAttributes <- data.frame(
+      name = vapply(options[["problems"]], `[[`, character(1), "problemName"),
+      strength = vapply(options[["problems"]], .ln1NetSeverityValue, numeric(1)),
+      stringsAsFactors = FALSE
+    )
+    state <- createJaspState(nodeAttributes)
+    state$dependOn("problems")
+    jaspResults[["nodeAttributesState"]] <- state
+  }
 
   .ln1NetEdgelists(jaspResults, options)
 }
@@ -85,6 +86,8 @@ It is important to recognize that PECAN represents perceived causality, not nece
   for (i in seq_along(options[["connectionList"]])) {
     edgelistOptions <- options[["connectionList"]][[i]]
     edgelistName <- edgelistOptions[["name"]]
+    if (!is.null(jaspResults[["edgelistContainer"]][[edgelistName]]))
+      next
     if (!.ln1NetEdgelistReady(edgelistOptions, nodeNames))
       next
     if (isTRUE(edgelistOptions[["allConnections"]])) {
@@ -101,6 +104,9 @@ It is important to recognize that PECAN represents perceived causality, not nece
 }
 
 .ln1NetAllEdges <- function(allConnStrengths, nodeNames) {
+  allConnStrengths <- .ln1NetAllConnectionMatrix(allConnStrengths, nodeNames)[["rows"]]
+  if (is.null(allConnStrengths))
+    stop(gettext("Complete the connection strengths for all selected problems."), call. = FALSE)
   edges <- .ln1NetEmptyEdgelist()
   for (i in seq_along(allConnStrengths)) {
     fromName <- nodeNames[i]
@@ -211,13 +217,13 @@ It is important to recognize that PECAN represents perceived causality, not nece
   # Keep the existing degreeIn/degreeOut IDs for saved output compatibility.
   # These are signed sums, not counts; the displayed labels state that explicitly.
   centrality <- tidygraph::tbl_graph(nodes=nodeAttributes, edges=edgelist, directed = TRUE) |>
-    tidygraph::activate(nodes) |>
+    tidygraph::activate("nodes") |>
     dplyr::mutate(
-      severity = strength,
-      strengthIn = tidygraph::centrality_degree(weights = abs(weight), mode = "in"),
-      strengthOut = tidygraph::centrality_degree(weights = abs(weight), mode = "out"),
-      degreeIn = tidygraph::centrality_degree(weights = weight, mode = "in"),
-      degreeOut = tidygraph::centrality_degree(weights = weight, mode = "out")
+      severity = .data$strength,
+      strengthIn = tidygraph::centrality_degree(weights = abs(.data$weight), mode = "in"),
+      strengthOut = tidygraph::centrality_degree(weights = abs(.data$weight), mode = "out"),
+      degreeIn = tidygraph::centrality_degree(weights = .data$weight, mode = "in"),
+      degreeOut = tidygraph::centrality_degree(weights = .data$weight, mode = "out")
     ) |>
     as.data.frame()
 
@@ -304,6 +310,8 @@ It is important to recognize that PECAN represents perceived causality, not nece
       edgelistOptions <- options[["connectionList"]][[i]]
       if (isTRUE(edgelistOptions[["plotNetwork"]])) {
         edgelistName <- edgelistOptions[["name"]]
+        if (!is.null(jaspResults[["networkPlotContainer"]][[edgelistName]]))
+          next
         useAllConnections <- isTRUE(edgelistOptions[["allConnections"]])
         dataPlot <- createJaspPlot(
           title = edgelistName,
@@ -311,19 +319,14 @@ It is important to recognize that PECAN represents perceived causality, not nece
           width = 480,
           position = 2
         )
-        dataPlot$dependOn(
-          options = c(
-            "plotLayout", "colorPalette", "plotSeverityFill", "plotSeveritySize", "plotSeverityAlpha", 
-            "plotStrengthColor", "plotStrengthWidth", "plotStrengthAlpha"
-          )
-        )
+        dataPlot$dependOn(.ln1NetPlotDependencies())
 
         edgelistReady <- .ln1NetEdgelistReady(edgelistOptions, nodeNames)
         selfLoops <- if (useAllConnections) character(0) else .ln1NetFindSelfLoops(edgelistOptions)
 
         if (length(selfLoops) > 0) {
           dataPlot$setError(gettextf(
-            "A problem cannot be connected to itself. Please fix: %s.",
+            "A problem cannot be connected to itself. Please fix: %1$s.",
             paste(selfLoops, collapse = ", ")
           ))
         } else if (edgelistReady) {
