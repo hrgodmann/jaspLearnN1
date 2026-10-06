@@ -295,6 +295,8 @@ Forecasting <- function(jaspResults, dataset = NULL, options) {
   }
 
   if (jaspBase::isTryError(mod)) {
+    if (length(unique(stats::na.omit(dataset[["y"]]))) < 2L)
+      .quitAnalysis(gettext("The selected ARIMA model could not be estimated from this constant series. Choose a model suitable for constant data. For a stochastic simulation, use a positive noise standard deviation."))
     .quitAnalysis(jaspBase::.extractErrorMessage(mod))
   }
 

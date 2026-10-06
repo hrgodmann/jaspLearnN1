@@ -44,26 +44,7 @@
 }
 
 .ln1ForeWriteCsv <- function(data, path) {
-  if (dir.exists(path))
-    stop(gettext("The destination is a folder. Choose a CSV file name."), call. = FALSE)
-  if (!dir.exists(dirname(path)))
-    stop(gettext("The destination folder does not exist."), call. = FALSE)
-  if (file.exists(path) && file.access(path, mode = 2L) != 0L)
-    stop(gettext("The destination file is not writable."), call. = FALSE)
-  temporary <- tempfile(pattern = ".jasp-forecast-", tmpdir = dirname(path), fileext = ".csv")
-  on.exit(unlink(temporary), add = TRUE)
-  utils::write.csv(data, temporary, row.names = FALSE)
-  if (!file.rename(temporary, path))
-    stop(gettext("The CSV could not replace the destination file."), call. = FALSE)
-  invisible(NULL)
-}
-
-.ln1ForeExportEscape <- function(text) {
-  text <- gsub("&", "&amp;", text, fixed = TRUE)
-  text <- gsub("<", "&lt;", text, fixed = TRUE)
-  text <- gsub(">", "&gt;", text, fixed = TRUE)
-  text <- gsub('"', "&quot;", text, fixed = TRUE)
-  gsub("'", "&#39;", text, fixed = TRUE)
+  .ln1WriteCsv(data, path)
 }
 
 .ln1ForeSaveForecast <- function(jaspResults, dataset, options, result, ready, clicked) {
@@ -102,7 +83,7 @@
     failed = c(gettext("The forecasts could not be saved. Correct the inputs or choose a writable CSV destination, then click Export CSV / Save again."), record[["error"]]),
     incomplete = gettext("No CSV was written. Select an outcome and request at least one forecast, then click Export CSV / Save again."),
     gettext("Changes have not been exported. Click Export CSV / Save again to write the current forecasts."))
-  text <- paste0("<p>", .ln1ForeExportEscape(message), "</p>", collapse = "")
+  text <- paste0("<p>", .ln1EscapeHtml(message), "</p>", collapse = "")
   status <- createJaspHtml(text, elementType = "div", title = gettext("Forecast export"), position = 5)
   dependencies <- c(.ln1ForeGetDataDependencies(), "forecastLength", "forecastSave")
   dependencies <- c(dependencies, intersect(c("forecastExportRequest", "forecastExportSession"), names(options)))

@@ -51,29 +51,7 @@
 }
 
 .ln1NetWriteCsv <- function(data, path) {
-  if (dir.exists(path))
-    stop(gettext("The destination is a folder. Choose a CSV file name."), call. = FALSE)
-  if (!dir.exists(dirname(path)))
-    stop(gettext("The destination folder does not exist."), call. = FALSE)
-  if (file.exists(path) && file.access(path, mode = 2L) != 0L)
-    stop(gettext("The destination file is not writable."), call. = FALSE)
-
-  # Serialize fully before replacing an existing export. A same-directory rename
-  # avoids cross-filesystem moves; a failed write/rename leaves the old file alone.
-  temporary <- tempfile(pattern = ".jasp-network-", tmpdir = dirname(path), fileext = ".csv")
-  on.exit(unlink(temporary), add = TRUE)
-  utils::write.csv(data, file = temporary, row.names = FALSE, na = "")
-  if (!file.rename(temporary, path))
-    stop(gettext("The CSV could not replace the destination file."), call. = FALSE)
-  return(invisible(NULL))
-}
-
-.ln1NetExportEscape <- function(text) {
-  text <- gsub("&", "&amp;", text, fixed = TRUE)
-  text <- gsub("<", "&lt;", text, fixed = TRUE)
-  text <- gsub(">", "&gt;", text, fixed = TRUE)
-  text <- gsub('"', "&quot;", text, fixed = TRUE)
-  return(gsub("'", "&#39;", text, fixed = TRUE))
+  .ln1WriteCsv(data, path, na = "")
 }
 
 .ln1NetExportStatus <- function(jaspResults, record, options) {
@@ -95,7 +73,7 @@
       messages <- c(messages, gettextf("%1$s was omitted because it contains unfinished or invalid connections.", name))
   }
   messages <- c(gettextf("CSV destination: %1$s.", options[["networkSavePath"]]), messages)
-  text <- paste0("<p>", .ln1NetExportEscape(messages), "</p>", collapse = "")
+  text <- paste0("<p>", .ln1EscapeHtml(messages), "</p>", collapse = "")
   status <- createJaspHtml(text, elementType = "div", title = gettext("Network export"), position = 5)
   status$dependOn(.ln1NetExportDependencies(options))
   jaspResults[["networkExport"]] <- status

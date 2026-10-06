@@ -1,13 +1,13 @@
 # Time preparation shared by Treatment's model and plots.
 
 .ln1TreatUpgradeState <- function(jaspResults) {
-  version <- 4L
+  version <- 5L
   marker <- jaspResults[["treatmentTimeVersion"]]
   if (!is.null(marker) && identical(marker$object, version))
     return(invisible(NULL))
 
   # Rebuild models and outputs using the current phase validation, coding,
-  # confidence labels, and model-error handling.
+  # confidence labels, model-error handling, and phase-coloured plot layers.
   for (key in c("simulatedDataState", "modelState", "modelErrorState", "coefTable", "autoCorTable",
                 "dataPlot", "analysisPlot", "timeInfo", "introText",
                 "phaseComparisons", "phaseSummary")) {

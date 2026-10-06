@@ -30,3 +30,36 @@ utils::globalVariables(".data", package = environment())
     jaspResults[["introText"]] <- introText
   }
 }
+
+# Serialize in the destination directory before replacing an existing export.
+# Callers supply the file format; save intent and status stay in each analysis.
+.ln1WriteExport <- function(path, writer) {
+  if (!is.character(path) || length(path) != 1L || is.na(path) || !nzchar(path))
+    stop(gettext("Choose a file name for the export."), call. = FALSE)
+  if (dir.exists(path))
+    stop(gettext("The destination is a folder. Choose a file name."), call. = FALSE)
+  if (!dir.exists(dirname(path)))
+    stop(gettext("The destination folder does not exist."), call. = FALSE)
+  if (file.exists(path) && file.access(path, mode = 2L) != 0L)
+    stop(gettext("The destination file is not writable."), call. = FALSE)
+
+  temporary <- tempfile(pattern = ".jasp-learnn1-", tmpdir = dirname(path))
+  on.exit(unlink(temporary), add = TRUE)
+  writer(temporary)
+  if (!file.rename(temporary, path))
+    stop(gettext("The export could not replace the destination file."), call. = FALSE)
+  invisible(NULL)
+}
+
+.ln1WriteCsv <- function(data, path, na = "NA") {
+  .ln1WriteExport(path, function(temporary)
+    utils::write.csv(data, file = temporary, row.names = FALSE, na = na))
+}
+
+.ln1EscapeHtml <- function(text) {
+  text <- gsub("&", "&amp;", text, fixed = TRUE)
+  text <- gsub("<", "&lt;", text, fixed = TRUE)
+  text <- gsub(">", "&gt;", text, fixed = TRUE)
+  text <- gsub('"', "&quot;", text, fixed = TRUE)
+  gsub("'", "&#39;", text, fixed = TRUE)
+}

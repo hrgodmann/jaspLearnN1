@@ -92,19 +92,11 @@
   preset <- .ln1NetValidatePreset(preset)
   if (!.ln1NetPresetString(path, nonempty = TRUE) || dir.exists(path))
     stop(gettext("Choose a JSON file name for the preset."), call. = FALSE)
-  if (!dir.exists(dirname(path)))
-    stop(gettext("The destination folder does not exist."), call. = FALSE)
-  if (file.exists(path) && file.access(path, mode = 2L) != 0L)
-    stop(gettext("The destination file is not writable."), call. = FALSE)
   text <- jsonlite::toJSON(preset, auto_unbox = TRUE, pretty = TRUE, null = "null")
   if (nchar(text, type = "bytes") > 1024^2)
     stop(gettext("The preset file is too large. The maximum size is 1 MiB."), call. = FALSE)
-  temporary <- tempfile(pattern = ".jasp-network-preset-", tmpdir = dirname(path), fileext = ".json")
-  on.exit(unlink(temporary), add = TRUE)
-  writeLines(enc2utf8(text), temporary, useBytes = TRUE)
-  if (!file.rename(temporary, path))
-    stop(gettext("The preset could not replace the destination file."), call. = FALSE)
-  invisible(NULL)
+  .ln1WriteExport(path, function(temporary)
+    writeLines(enc2utf8(text), temporary, useBytes = TRUE))
 }
 
 .ln1NetPresetRequest <- function(options) {
@@ -168,7 +160,7 @@
   if (length(messages) == 0L) {
     jaspResults[[key]] <- NULL
   } else {
-    text <- paste0("<p>", .ln1NetExportEscape(messages), "</p>", collapse = "")
+    text <- paste0("<p>", .ln1EscapeHtml(messages), "</p>", collapse = "")
     jaspResults[[key]] <- createJaspHtml(text, elementType = "div", title = title, position = 6)
   }
   invisible(NULL)

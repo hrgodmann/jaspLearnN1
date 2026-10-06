@@ -16,13 +16,13 @@
 #
 
 .ln1ForeUpgradeState <- function(jaspResults) {
-  version <- 3L
+  version <- 4L
   marker <- jaspResults[["forecastCacheVersion"]]
   if (!is.null(marker) && identical(marker$object, version))
     return(invisible(NULL))
 
   # Rebuild earlier calculation/output formats together, including corrected
-  # simulated lengths and the current coefficient and prediction explanations.
+  # simulated lengths, explanations and mapped observed/forecast plot colours.
   keys <- c("dataState", "modelState", "forecastResult", "coefTable",
             "dataPlot", "forecastPlot", "forecastTable", "forecastExport",
             "introText")
@@ -293,13 +293,13 @@
   if (type %in% c("line", "both")) {
     lineData <- if (nrow(predictions) == 1L) series[series[["source"]] == observedLabel, , drop = FALSE] else series
     if (nrow(lineData) > 1L)
-      plot <- plot + jaspGraphs::geom_line(data = lineData, na.rm = TRUE)
+      plot <- plot + ggplot2::geom_line(data = lineData, linewidth = 1, na.rm = TRUE)
   }
   if (type %in% c("points", "both")) {
-    plot <- plot + jaspGraphs::geom_point(na.rm = TRUE)
+    plot <- plot + ggplot2::geom_point(size = 3, shape = 21, fill = "grey", stroke = .5, na.rm = TRUE)
   } else if (nrow(predictions) == 1) {
     # A one-step forecast must remain visible when the line display is selected.
-    plot <- plot + jaspGraphs::geom_point(data = predicted)
+    plot <- plot + ggplot2::geom_point(data = predicted, size = 3, shape = 21, fill = "grey", stroke = .5)
   }
   plot <- plot +
     ggplot2::scale_colour_manual(name = "", values = colors) +

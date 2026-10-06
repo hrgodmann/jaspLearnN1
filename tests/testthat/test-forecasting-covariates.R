@@ -344,6 +344,9 @@ test_that("unused future rows do not invalidate historical estimation or shorter
   pointLayers <- Filter(function(layer) all(c("x", "y") %in% names(layer)), built$data)
   expect_true(any(vapply(pointLayers, function(layer)
     any(is.finite(layer$x) & layer$x == data$clock[91]), logical(1))))
+  forecastPoints <- which(vapply(plot$layers, function(layer) inherits(layer$geom, "GeomPoint"), logical(1)))
+  expect_length(forecastPoints, 1L)
+  expect_identical(built$data[[forecastPoints]]$colour, "#0072B2")
 
   # An unused missing time must not disable sorting of the requested rows.
   unsorted <- data[c(seq_len(90), 92, 91, 93, 94), ]
@@ -405,6 +408,7 @@ test_that("forecast table plot and CSV share the same conditional predictions", 
   options$forecastLength <- 4L
   options$forecastTable <- TRUE
   options$forecastTimeSeries <- TRUE
+  options$forecastTimeSeriesObserved <- TRUE
   options$forecastTimeSeriesType <- "both"
   options$forecastSave <- tempfile(fileext = ".csv")
   options$forecastExportSession <- "native-forecast-covariates"
@@ -436,6 +440,15 @@ test_that("forecast table plot and CSV share the same conditional predictions", 
       isTRUE(all.equal(as.numeric(selected$y), reference$y, tolerance = 1e-7))
   }
   expect_true(any(vapply(layers, containsForecast, logical(1))))
+  seriesLayers <- which(vapply(plot$layers, function(layer)
+    inherits(layer$geom, "GeomLine") || inherits(layer$geom, "GeomPoint"), logical(1)))
+  expect_length(seriesLayers, 2L)
+  for (index in seriesLayers) {
+    layer <- layers[[index]]
+    expect_true(containsForecast(layer))
+    expect_identical(layer$colour, ifelse(layer$x %in% reference$t, "#0072B2", "black"))
+    expect_length(unique(layer$group), 2L)
+  }
 })
 
 test_that("unavailable future predictors leave valid coefficients visible", {

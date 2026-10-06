@@ -335,8 +335,9 @@ Consider endpoint and slope differences together: an improved endpoint can also 
         color = .data[[variableNames[["phase"]]]]
       )
     ) +
-    jaspGraphs::geom_line(na.rm = TRUE) +
-    jaspGraphs::geom_point(na.rm = TRUE) +
+    # Preserve JASP styling without fixed colours overriding the phase mapping.
+    ggplot2::geom_line(linewidth = 1, na.rm = TRUE) +
+    ggplot2::geom_point(size = 3, shape = 21, fill = "grey", stroke = .5, na.rm = TRUE) +
     ggplot2::scale_x_continuous(
       name = if (options[["inputType"]] == "loadData") decodeColNames(xName) else gettext("Time"),
       breaks = xBreaks,
@@ -387,7 +388,8 @@ Consider endpoint and slope differences together: an improved endpoint can also 
         color = .data[[phaseName]]
       )
     ) +
-    jaspGraphs::geom_point(alpha = 0.4, na.rm = TRUE) +
+    ggplot2::geom_point(size = 3, shape = 21, fill = "grey", stroke = .5,
+                       alpha = 0.4, na.rm = TRUE) +
     ggplot2::geom_line(
       mapping = ggplot2::aes(y = .data[[fittedName]]),
       linewidth = 1.2,

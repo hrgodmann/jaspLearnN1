@@ -1,5 +1,7 @@
 # Phase endpoints and trends are linear contrasts of the existing GLS fit.
 # Keep its chronological AR(1) clock and regression parameterization unchanged.
+# Data-consuming helpers require .ln1TreatPrepareData() output, which already
+# enforces one contiguous episode per phase and valid phase-local clocks.
 
 .ln1TreatComparisonDependencies <- function() {
   c(.ln1TreatGetDataDependencies(), "phaseComparisons", "comparisonPhase",
@@ -30,14 +32,6 @@
   indices <- lapply(phaseNames, function(name) which(as.character(phase) == name))
   ends <- vapply(indices, function(i) utils::tail(i, 1L), integer(1))
   starts <- vapply(indices, function(i) i[1L], integer(1))
-  runs <- rle(as.character(phase))$values
-  episodes <- vapply(phaseNames, function(name) sum(runs == name), integer(1))
-  if (options[["inputType"]] == "simulateData") {
-    # Adjacent simulated rows with the same name also restart the mean clock.
-    # Treat those as distinct episodes, even though the phase labels touch.
-    episodes <- vapply(indices, function(i) 1L + sum(diff(dataset[[variables[["time"]]]][i]) <= 0), integer(1))
-    episodes <- pmax(episodes, vapply(phaseNames, function(name) sum(runs == name), integer(1)))
-  }
   newData <- data.frame(time = dataset[[variables[["time"]]]][ends],
                         phase = factor(phaseNames, levels = levels(phase)))
   design <- function(data) {
@@ -52,8 +46,7 @@
   slope <- one - design(newData)
   list(phases = data.frame(phase = phaseNames,
                            startTime = dataset[[variables[["t"]]]][starts],
-                           endTime = dataset[[variables[["t"]]]][ends],
-                           episodes = episodes),
+                           endTime = dataset[[variables[["t"]]]][ends]),
        endpoint = endpoint, slope = slope)
 }
 
@@ -84,8 +77,6 @@
   comparison <- select(options[["comparisonPhase"]], 2L)
   if (comparison == reference)
     stop(gettext("Select two different phases for the comparison."), call. = FALSE)
-  if (any(phases[["episodes"]][c(comparison, reference)] != 1L))
-    stop(gettext("Each compared phase must be one continuous period. Give repeated episodes distinct names, such as Baseline 1 and Baseline 2, to compare their endpoints."), call. = FALSE)
   c(comparison = comparison, reference = reference)
 }
 
@@ -106,8 +97,6 @@
 
 .ln1TreatPhaseSummaries <- function(dataset, modelObject, options) {
   design <- .ln1TreatPhaseDesign(dataset, modelObject, options)
-  if (any(design[["phases"]][["episodes"]] != 1L))
-    stop(gettext("Each summarized phase must be one continuous period. Give repeated episodes distinct names, such as Baseline 1 and Baseline 2, to report their endpoints."), call. = FALSE)
   index <- rep(seq_len(nrow(design[["phases"]])), each = 2L)
   weights <- design[["endpoint"]][index, , drop = FALSE]
   weights[seq(2L, nrow(weights), by = 2L), ] <- design[["slope"]]

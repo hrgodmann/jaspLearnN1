@@ -8,6 +8,7 @@ test_that("Simulated data input works", {
   options$inputType <- "simulateData"
   options$coefficientsTable <- TRUE
   options$autocorrelationTable <- TRUE
+  options$plotData <- options$plotAnalysis <- TRUE
   options$simPhaseEffects <- list(list(simPhaseName = "pre", simPhaseEffectSimple = 0, simPhaseEffectInteraction = 0,
       simPhaseEffectN = 20), list(simPhaseName = "treat", simPhaseEffectSimple = 5,
       simPhaseEffectInteraction = 0, simPhaseEffectN = 20), list(
@@ -20,6 +21,21 @@ test_that("Simulated data input works", {
   plotName <- results[["results"]][["dataPlot"]][["data"]]
   testPlot <- results[["state"]][["figures"]][[plotName]][["obj"]]
   jaspTools::expect_equal_plots(testPlot, "data-plot")
+
+  # Both observed points and lines must retain phase colours and separate
+  # groups; a fixed geom colour would silently connect phase boundaries.
+  for (key in c("dataPlot", "analysisPlot")) {
+    plot <- results$state$figures[[results$results[[key]]$data]]$obj
+    layers <- ggplot2::ggplot_build(plot)$data[1:2]
+    for (layer in layers) {
+      expect_length(unique(layer$colour), 3L)
+      expect_length(unique(layer$group), 3L)
+      expect_equal(unname(vapply(split(layer$x, layer$group),
+                                 function(x) diff(range(x)), numeric(1))), rep(19, 3L))
+    }
+    ordered <- lapply(layers, function(layer) layer[order(layer$x), ])
+    expect_equal(ordered[[1L]]$colour, ordered[[2L]]$colour)
+  }
 
   # The generated observations remain unchanged; independently estimate the
   # single-series GLS model using phase-local mean time and continuous AR time.
