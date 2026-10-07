@@ -33,7 +33,7 @@ test_that("legacy Treatment models and outputs are rebuilt with phase comparison
 
   originalUpgrade <- getFromNamespace(".ln1TreatUpgradeState", "jaspLearnN1")
   originalEstimate <- getFromNamespace(".ln1TreatEstimateModel", "jaspLearnN1")
-  for (oldVersion in list(NULL, 1L, 2L, 3L, 4L)) {
+  for (oldVersion in list(NULL, 1L, 2L, 3L, 4L, 5L, 6L)) {
     recorded <- new.env(parent = emptyenv())
     recorded$called <- FALSE
     result <- testthat::with_mocked_bindings({
@@ -97,9 +97,9 @@ test_that("legacy Treatment models and outputs are rebuilt with phase comparison
 
     expect_true(recorded$called)
     expect_true(all(recorded$cleared))
-    expect_identical(recorded$version, 5L)
+    expect_identical(recorded$version, 7L)
     expect_true(recorded$idempotent)
-    expect_identical(recorded$secondVersion, 5L)
+    expect_identical(recorded$secondVersion, 7L)
     expect_identical(result$status, "complete")
     expect_s3_class(recorded$rebuilt, "gls")
     expect_null(recorded$rebuilt$modelStruct$reStruct)

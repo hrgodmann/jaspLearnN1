@@ -16,13 +16,13 @@
 #
 
 .ln1ForeUpgradeState <- function(jaspResults) {
-  version <- 4L
+  version <- 5L
   marker <- jaspResults[["forecastCacheVersion"]]
   if (!is.null(marker) && identical(marker$object, version))
     return(invisible(NULL))
 
-  # Rebuild earlier calculation/output formats together, including corrected
-  # simulated lengths, explanations and mapped observed/forecast plot colours.
+  # Recheck cached models and forecasts using the current convergence,
+  # residual-variance and finite-prediction validation before displaying them.
   keys <- c("dataState", "modelState", "forecastResult", "coefTable",
             "dataPlot", "forecastPlot", "forecastTable", "forecastExport",
             "introText")

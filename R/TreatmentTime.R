@@ -1,13 +1,14 @@
 # Time preparation shared by Treatment's model and plots.
 
 .ln1TreatUpgradeState <- function(jaspResults) {
-  version <- 5L
+  version <- 7L
   marker <- jaspResults[["treatmentTimeVersion"]]
   if (!is.null(marker) && identical(marker$object, version))
     return(invisible(NULL))
 
-  # Rebuild models and outputs using the current phase validation, coding,
-  # confidence labels, model-error handling, and phase-coloured plot layers.
+  # Rebuild cached simulations and outputs to enforce the simulation size limit
+  # and refresh legends, escaped footnotes and comparison messages in saved files.
+  # This also retains the earlier model and chronology upgrades.
   for (key in c("simulatedDataState", "modelState", "modelErrorState", "coefTable", "autoCorTable",
                 "dataPlot", "analysisPlot", "timeInfo", "introText",
                 "phaseComparisons", "phaseSummary")) {

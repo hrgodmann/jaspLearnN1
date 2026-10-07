@@ -99,6 +99,36 @@ test_that("invalid simulation settings fail with actionable messages before gene
   expect_match(result$results$errorMessage, "greater than -1 and less than 1")
 })
 
+test_that("simulation size is limited across phases before generating observations", {
+  options <- .treatValidOptions()
+  simulate <- .treatValidFunction(".ln1TreatSimulateData")
+  options$simDependentSd <- 0
+  options$simPhaseEffects[[1L]]$simPhaseEffectN <- 400
+  options$simPhaseEffects[[2L]]$simPhaseEffectN <- 600
+  expect_equal(nrow(simulate(options)), 1000L)
+
+  # Neither individual phase exceeds the cap: the combined size must be checked.
+  options$simPhaseEffects[[2L]]$simPhaseEffectN <- 601
+  set.seed(582)
+  initialSeed <- .Random.seed
+  expect_error(simulate(options), "1,000 time points across all phases", fixed = TRUE)
+  expect_identical(.Random.seed, initialSeed)
+  result <- jaspTools::runAnalysis("Treatment", NULL, options, view = FALSE)
+  expect_identical(result$status, "validationError")
+  expect_match(result$results$errorMessage, "Reduce the time points", fixed = TRUE)
+
+  # Reject an extreme request before creating its vectors or running a model.
+  options$simPhaseEffects[[1L]]$simPhaseEffectN <- 1e8
+  expect_error(simulate(options), "1,000 time points across all phases", fixed = TRUE)
+
+  # The restriction applies to simulation, not preparation of loaded observations.
+  options$inputType <- "loadData"
+  options$dependent <- "y"; options$time <- "t"; options$phase <- "phase"
+  data <- data.frame(y = sin(seq_len(1002)), t = seq_len(1002),
+                     phase = rep(c("A", "B"), each = 501))
+  expect_equal(nrow(.treatValidFunction(".ln1TreatPrepareData")(data, options)), 1002L)
+})
+
 test_that("zero-noise demonstrations and real fit failures retain the data plot", {
   for (simulation in c(TRUE, FALSE)) {
     options <- .treatValidOptions()

@@ -9,3 +9,4 @@
 ^\.DS_Store$
 (^|/)\.gitkeep$
 ^learnN1dat\.csv$
+^tempAI$

@@ -207,3 +207,51 @@ test_that("forecast CSV replacement failures retain old bytes and clean temporar
   expect_identical(readLines(path), "existing complete file")
   expect_identical(list.files(directory, all.files = TRUE, no.. = TRUE), "forecast.csv")
 })
+
+test_that("forecast CSV headers distinguish outcome names from time and interval bounds", {
+  set.seed(918)
+  data <- data.frame(symptom = stats::rnorm(40L), clock = seq_len(40L))
+  reserved <- c("t", "lower80", "upper80", "lower95", "upper95")
+  path <- tempfile(fileext = ".csv")
+  on.exit(unlink(path), add = TRUE)
+  for (outcome in c(reserved, "symptom", "t_forecast", "daily symptom", "sympt\u00f4me")) {
+    options <- .foreExportOptions(path)
+    options$inputType <- "loadData"
+    options$dependent <- outcome
+    options$time <- "clock"
+    options$covariates <- character()
+    options$p <- options$d <- options$q <- 0L
+    options$forecastExportRequest <- TRUE
+    renamed <- data
+    names(renamed)[1L] <- outcome
+    result <- jaspTools::runAnalysis("Forecasting", renamed, options, view = FALSE)
+    expect_identical(result$status, "complete")
+    expect_match(result$results$forecastExport$rawtext, "Forecasts saved")
+    exported <- utils::read.csv(path, check.names = FALSE)
+    outcomeHeader <- if (outcome %in% reserved) paste0(outcome, "_forecast") else outcome
+    expect_identical(names(exported), c("t", outcomeHeader, reserved[-1L]))
+    expect_identical(anyDuplicated(names(exported)), 0L)
+    rows <- result$results$forecastTable$data
+    expect_equal(exported[[outcomeHeader]], vapply(rows, `[[`, numeric(1), "y"))
+    for (bound in reserved[-1L])
+      expect_equal(exported[[bound]], vapply(rows, `[[`, numeric(1), bound))
+  }
+})
+
+test_that("an earlier CSV format becomes pending without replaying the saved click", {
+  path <- tempfile(fileext = ".csv")
+  on.exit(unlink(path), add = TRUE)
+  options <- .foreExportOptions(path)
+  options$forecastExportRequest <- TRUE
+  output <- .foreExportRun(options, function(results, data, opts, prediction, recorded) {
+    previous <- results[["forecastExportState"]]$object
+    previous$request$formatVersion <- NULL
+    results[["forecastExportState"]] <- jaspBase::createJaspState(previous)
+    writeLines("keep previous CSV format", path)
+    expect_identical(.foreExportStep(results, data, opts, prediction)$status, "pending")
+    expect_identical(readLines(path), "keep previous CSV format")
+    opts$forecastExportRequest <- FALSE
+    expect_identical(.foreExportStep(results, data, opts, prediction)$status, "success")
+  })
+  expect_identical(output$result$status, "complete")
+})

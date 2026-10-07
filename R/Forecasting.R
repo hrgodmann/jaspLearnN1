@@ -299,6 +299,7 @@ Forecasting <- function(jaspResults, dataset = NULL, options) {
       .quitAnalysis(gettext("The selected ARIMA model could not be estimated from this constant series. Choose a model suitable for constant data. For a stochastic simulation, use a positive noise standard deviation."))
     .quitAnalysis(jaspBase::.extractErrorMessage(mod))
   }
+  .ln1ForeValidateFit(mod)
 
   if (!is.null(xreg)) {
     .ln1ForeCheckPredictors(xreg, differences = mod[["arma"]][6L],
@@ -340,6 +341,15 @@ Forecasting <- function(jaspResults, dataset = NULL, options) {
                                        level = c(80, 95)), silent = TRUE)
   if (jaspBase::isTryError(prediction))
     .quitAnalysis(jaspBase::.extractErrorMessage(prediction))
+  limits <- c("80%", "95%")
+  validBounds <- function(bounds) {
+    is.matrix(bounds) && is.numeric(bounds) && nrow(bounds) == horizon &&
+      all(limits %in% colnames(bounds)) && all(is.finite(bounds[, limits, drop = FALSE]))
+  }
+  if (!is.numeric(prediction[["mean"]]) || length(prediction[["mean"]]) != horizon ||
+      any(!is.finite(prediction[["mean"]])) ||
+      !validBounds(prediction[["lower"]]) || !validBounds(prediction[["upper"]]))
+    .quitAnalysis(gettext("The requested forecasts or prediction intervals could not be computed as finite values. Review the model and any future covariate values, or request a shorter forecast horizon."))
   return(data.frame(
     t = forecastTimes,
     y = as.numeric(prediction[["mean"]]),

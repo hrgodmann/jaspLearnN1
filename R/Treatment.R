@@ -181,13 +181,7 @@ Consider endpoint and slope differences together: an improved endpoint can also 
 
   # One individual has a fixed intercept and correlated residuals. There is
   # no between-series random-intercept variance to estimate from this series.
-  mod <- tryCatch(nlme::gls(
-    model = y ~ time * phase,
-    data = modelData,
-    correlation = nlme::corAR1(form = ~ occasion),
-    method = "REML",
-    na.action = stats::na.exclude
-  ), error = function(e) .quitAnalysis(gettext("The phase-trend model could not be estimated reliably. Check for constant or nearly deterministic outcomes, very short phases, and extreme values. The data plot remains available.")))
+  mod <- .ln1TreatFitGls(modelData)
   # Build labels from the fitted design; never evaluate decoded user names as
   # formula syntax (a column named '.' would otherwise expand other terms).
   term <- attr(design, "assign")
@@ -285,6 +279,14 @@ Consider endpoint and slope differences together: an improved endpoint can also 
 .ln1TreatFillAutoCorTable <- function(table, modelObject, options) {
   table[["name"]] <- "AR(1)"
 
+  if (identical(attr(modelObject, "ln1TreatCorrelationSignIdentified"), FALSE)) {
+    table[["coef"]] <- NA_real_
+    table[["lower"]] <- NA_real_
+    table[["upper"]] <- NA_real_
+    table$addFootnote(gettext("The sign of the one-interval autocorrelation is not identifiable: all observed outcomes are separated by even numbers of measurement intervals. Positive and negative values give the same correlations between observed outcomes. The signed estimate and its interval are omitted; phase estimates and comparisons use the fitted observed-outcome covariance."))
+    return(invisible(NULL))
+  }
+
   # Point estimate is always available from the model
   corStruct <- modelObject[["modelStruct"]][["corStruct"]]
   phi <- as.numeric(stats::coef(corStruct, unconstrained = FALSE))
@@ -345,7 +347,10 @@ Consider endpoint and slope differences together: an improved endpoint can also 
     ) +
     ggplot2::scale_y_continuous(name = decodeColNames(yName), breaks = yBreaks, limits = range(yBreaks)) +
     jaspGraphs::geom_rangeframe() +
-    jaspGraphs::themeJaspRaw()
+    jaspGraphs::themeJaspRaw() +
+    ggplot2::labs(color = gettext("Phase")) +
+    ggplot2::guides(color = ggplot2::guide_legend(ncol = 1)) +
+    ggplot2::theme(legend.position = "bottom")
 
   return(p)
 }

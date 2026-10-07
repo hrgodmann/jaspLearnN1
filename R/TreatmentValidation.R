@@ -45,6 +45,9 @@
       .quitAnalysis(gettextf("Enter finite phase and phase-by-time effects for simulation phase '%1$s'.", name))
     name
   }, character(1))
+  totalN <- sum(vapply(phases, function(phase) phase[["simPhaseEffectN"]], numeric(1)))
+  if (totalN > 1000)
+    .quitAnalysis(gettext("Simulations are limited to 1,000 time points across all phases to keep fitting responsive. Reduce the time points per phase or remove phases."))
   if (anyDuplicated(labels))
     .quitAnalysis(gettext("Give every simulation phase a distinct name, such as Baseline 1, Treatment, and Baseline 2."))
   invisible(NULL)

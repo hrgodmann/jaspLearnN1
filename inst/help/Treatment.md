@@ -4,7 +4,7 @@ The analysis estimates phase-specific linear trends with AR(1) residual correlat
 
 ## Phase comparisons
 
-Use **Phase comparisons** to choose a **Compared phase** and a **Reference phase**. The automatic choices are the second and first phases in chronological order, respectively, regardless of alphabetical order or the regression's reference category. The output always names both phases. Explicit choices are kept until changed; if a selected phase is unavailable, select it again.
+Use **Phase comparisons** to choose a **Compared phase** and a **Reference phase**. The automatic choices are the second and first phases in chronological order, respectively, regardless of alphabetical order or the regression's reference category. The output always names both phases. Choosing the second phase as the reference while leaving the compared phase automatic selects the same phase twice; choose two different phases explicitly. After removing or renaming a phase, or switching to data with different phase names, check both selections because an unavailable choice can fall back to another entry.
 
 All differences are **compared phase minus reference phase**:
 
@@ -57,9 +57,15 @@ Measurement timing reports the observed count for every phase and flags phases w
 
 Missing outcomes are not imputed. Only observed outcomes contribute to estimation, but the autocorrelation uses their original scheduled positions. In this example, residual correlation between times 2 and 4 is `rho^2`, not `rho`. Correlation continues across phase boundaries. Missing time or phase values are rejected because the analysis cannot locate those observations reliably.
 
+The model is fitted from several positive, negative and zero correlation starting values, including values adapted to the observed gaps. The valid fit with the highest restricted likelihood is retained, allowing for numerical ties. This guards against a false zero-correlation solution under patterned missingness; it does not resolve the separate limitations of approximate inference in short series.
+
+If every observed outcome is separated from the others by an even number of scheduled intervals, the data cannot distinguish positive from negative one-interval autocorrelation: for example, `rho^2` is the same for `rho` and `-rho`. The signed AR(1) estimate and interval are then omitted with an explanation. Phase estimates and comparisons remain available because they use the same covariance between observed outcomes for either sign.
+
 Plots retain the chronological positions. Missing outcomes have no plotted point or fitted value; lines break at internal missing values. A missing final outcome can therefore make the visible line end before the endpoint evaluated in the comparison table. This handling does not resolve bias from informative missingness, such as measurements being omitted because symptoms were unusually severe.
 
 ## Simulations use two time variables
+
+Simulations are limited to **1,000 time points in total across all phases** to keep interactive fitting responsive. For example, three phases of 300 points are allowed; three phases of 500 points exceed the limit. This is a classroom responsiveness limit, not a statistical sample-size rule. Existing saved simulations above the limit must be reduced before rerunning. Loaded datasets are not subject to this simulation limit; larger datasets can take longer to fit.
 
 To retain the simulation controls' existing interpretation, regression time starts at 1 within each phase. The plot and AR(1) errors use a separate continuous sequence across all phases. A phase change does not reset the residual process. Endpoint comparisons evaluate each phase at the end of its own regression clock, while displayed endpoint times use the continuous measurement sequence. Simulated slopes are per measurement occasion.
 

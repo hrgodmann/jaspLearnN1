@@ -25,6 +25,42 @@ import "./common" as Common
 
 Form
 {
+	id: treatmentForm
+
+	// Phase names for the comparison selectors in simulation mode. Reading count,
+	// columnsNames and each name field's value makes QML re-evaluate the binding when
+	// rows are added, removed, initialized or renamed. JASP's native
+	// "simPhaseEffects.simPhaseName" source did not show the default phases in JASP 0.98.1.
+	function simulationPhaseNames()
+	{
+		var rowCount = simPhaseEffects.count
+		var keys = simPhaseEffects.columnsNames
+		var names = []
+		for (var i = 0; i < keys.length; ++i)
+		{
+			var field = simPhaseEffects.getRowControl(keys[i], "simPhaseName")
+			var name = field && field.value !== undefined && field.value !== null ? String(field.value) : ""
+			if (name.trim() !== "" && names.indexOf(name) < 0)
+				names.push(name)
+		}
+		return names
+	}
+
+	// JASP notifies levelsChanged for assignment and label edits, but a pure
+	// label reorder only reaches the assigned list's model in JASP 0.98.1.
+	property int phaseLevelsRevision: 0
+	readonly property QtObject phaseLevelConnections: Connections
+	{
+		target: phaseVariable.model
+		function onLabelsReordered() { treatmentForm.phaseLevelsRevision += 1 }
+	}
+
+	function loadedPhaseNames()
+	{
+		var revision = phaseLevelsRevision
+		return phaseVariable.levels
+	}
+
 	Group
 	{
 		columns: 2
@@ -68,6 +104,7 @@ Form
 			}
 			AssignedVariablesList
 			{
+				id:				phaseVariable
 				name:			"phase"
 				title:			qsTr("Phase Variable")
 				allowedColumns:	["nominal"]
@@ -198,10 +235,12 @@ Form
 							name: "simPhaseEffectN"
 							defaultValue: 20
 							min: 2
-							info: qsTr("At least two time points per phase are needed to estimate trends; uncertainty needs more than two per phase on average. These are estimation limits, not reliable-inference guarantees.")
+							max: 1000
+							info: qsTr("At least two time points per phase are needed to estimate trends; uncertainty needs more than two per phase on average. These are estimation limits, not reliable-inference guarantees. Simulations allow at most 1,000 time points across all phases to keep fitting responsive.")
 						}
 					}
 				}
+				Label { text: qsTr("Maximum 1,000 time points across all phases.") }
 			}
 		}
 
@@ -225,7 +264,13 @@ Form
 			{
 				name: "comparisonPhase"
 				label: qsTr("Compared phase")
-				source: inputType.value == "simulateData" ? ["simPhaseEffects.simPhaseName"] : [{name: "phase", use: "levels"}]
+				// Initialize after the input type, the simulation rows and the phase variable.
+				depends: [inputType, simPhaseEffects, "phase"]
+				// One values binding avoids both intermediate resets and JASP 0.98.1's
+				// sticky useSourceLevels flag when a source switches between modes.
+				values: inputType.value == "simulateData"
+					? treatmentForm.simulationPhaseNames()
+					: treatmentForm.loadedPhaseNames()
 				addEmptyValue: true
 				indexDefaultValue: 0
 				placeholderText: qsTr("Second phase in time (automatic)")
@@ -236,7 +281,11 @@ Form
 			{
 				name: "referencePhase"
 				label: qsTr("Reference phase")
-				source: inputType.value == "simulateData" ? ["simPhaseEffects.simPhaseName"] : [{name: "phase", use: "levels"}]
+				depends: [inputType, simPhaseEffects, "phase"]
+				// Keep both selectors on the same labels-only path.
+				values: inputType.value == "simulateData"
+					? treatmentForm.simulationPhaseNames()
+					: treatmentForm.loadedPhaseNames()
 				addEmptyValue: true
 				indexDefaultValue: 0
 				placeholderText: qsTr("First phase in time (automatic)")

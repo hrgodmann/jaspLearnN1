@@ -14,14 +14,14 @@
       all(colSums(coding) == 1) && sum(rowSums(coding) == 0) == 1L &&
       all(rowSums(coding) %in% c(0, 1))) {
     reference <- rownames(coding)[rowSums(coding) == 0]
-    table$addFootnote(gettextf("Coefficient reference phase: %1$s. The intercept is its fitted outcome at regression time 0. Phase coefficients are differences from this reference at regression time 0; interactions are slope differences. These are not automatically endpoint or treatment-onset comparisons.", reference))
+    table$addFootnote(gettextf("Coefficient reference phase: %1$s. The intercept is its fitted outcome at regression time 0. Phase coefficients are differences from this reference at regression time 0; interactions are slope differences. These are not automatically endpoint or treatment-onset comparisons.", .ln1EscapeHtml(reference)))
   } else {
     table$addFootnote(gettext("Phase coefficients use contrast coding without a single treatment-coded reference phase. Use Phase comparisons for explicitly named endpoint and slope differences."))
   }
   if (options[["inputType"]] == "simulateData") {
     table$addFootnote(gettext("Simulation regression time starts at 1 in each phase, so regression time 0 is one occasion before each phase's own first measurement."))
   } else {
-    table$addFootnote(gettextf("Regression time 0 means %1$s = 0 in the selected time variable. The supplied time origin is retained.", decodeColNames(options[["time"]])))
+    table$addFootnote(gettextf("Regression time 0 means %1$s = 0 in the selected time variable. The supplied time origin is retained.", .ln1EscapeHtml(decodeColNames(options[["time"]]))))
   }
 }
 
@@ -76,7 +76,7 @@
   reference <- select(options[["referencePhase"]], 1L)
   comparison <- select(options[["comparisonPhase"]], 2L)
   if (comparison == reference)
-    stop(gettext("Select two different phases for the comparison."), call. = FALSE)
+    stop(gettext("Select two different phases for the comparison. Automatic uses the second phase in chronological order for Compared phase and the first for Reference phase. Select both phases explicitly if needed."), call. = FALSE)
   c(comparison = comparison, reference = reference)
 }
 
@@ -141,8 +141,8 @@
     tryCatch({
       results <- .ln1TreatComparisonResults(dataset, jaspResults[["modelState"]]$object, options)
       table$addFootnote(gettextf("Endpoint times: %1$s = %2$s; %3$s = %4$s (chronological time).",
-                                results[["comparisonPhase"]][1L], format(results[["comparisonEnd"]][1L], digits = 15L, trim = TRUE),
-                                results[["referencePhase"]][1L], format(results[["referenceEnd"]][1L], digits = 15L, trim = TRUE)))
+                                .ln1EscapeHtml(results[["comparisonPhase"]][1L]), format(results[["comparisonEnd"]][1L], digits = 15L, trim = TRUE),
+                                .ln1EscapeHtml(results[["referencePhase"]][1L]), format(results[["referenceEnd"]][1L], digits = 15L, trim = TRUE)))
       results[["quantity"]] <- c(gettext("Endpoint difference"), gettext("Slope difference"))
       table$addRows(results[, c("comparisonPhase", "referencePhase", "quantity", "estimate", "SE", "df", "t", "p", "lower", "upper")])
     }, error = function(e) table$setError(conditionMessage(e)))

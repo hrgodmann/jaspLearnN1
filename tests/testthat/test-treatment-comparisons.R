@@ -301,6 +301,57 @@ test_that("phase comparison selection is explicit and rejects missing or identic
                ignore.case = TRUE)
 })
 
+test_that("a reference-only collision explains the chronological automatic choices", {
+  # Deliberately nonalphabetical order: automatic choices follow chronology.
+  phases <- data.frame(phase = c("Zulu baseline", "Act: treatment", "Later / follow-up"))
+  select <- .treatCompFunction(".ln1TreatSelectComparison")
+  options <- .treatCompOptions()
+  expect_identical(select(phases, options), c(comparison = 2L, reference = 1L))
+
+  options$referencePhase <- phases$phase[2L]
+  message <- tryCatch(select(phases, options), error = conditionMessage)
+  expect_match(message, "Select two different phases", fixed = TRUE)
+  expect_match(message, "second phase in chronological order for Compared phase", fixed = TRUE)
+  expect_match(message, "first for Reference phase", fixed = TRUE)
+
+  # Fixing the explicit selection keeps the automatic compared phase at two.
+  options$referencePhase <- phases$phase[3L]
+  expect_identical(select(phases, options), c(comparison = 2L, reference = 3L))
+  options$comparisonPhase <- phases$phase[1L]
+  expect_identical(select(phases, options), c(comparison = 1L, reference = 3L))
+})
+
+test_that("native coefficient and endpoint footnotes escape user-provided labels", {
+  data <- .treatCompFixture()
+  labels <- c('Baseline <α> & "A"', "Treatment > β & 'B'", "Later <γ>")
+  data$stage <- factor(rep(labels, each = 30L), levels = labels)
+  timeName <- 'Clock <day> & "visit"'
+  names(data)[names(data) == "clock"] <- timeName
+  options <- .treatCompOptions()
+  options$time <- timeName
+  options$coefficientsTable <- TRUE
+  options$comparisonPhase <- labels[2L]
+  options$referencePhase <- labels[1L]
+
+  result <- jaspTools::runAnalysis("Treatment", data, options, view = FALSE)
+  expect_identical(result$status, "complete")
+  expect_identical(result$results$coefTable$status, "complete")
+  expect_identical(result$results$phaseComparisons$status, "complete")
+  footnotes <- function(table)
+    paste(vapply(table$footnotes, `[[`, character(1), "text"), collapse = " ")
+  coefficientText <- footnotes(result$results$coefTable)
+  endpointText <- footnotes(result$results$phaseComparisons)
+  expect_match(coefficientText,
+    "Coefficient reference phase: Baseline &lt;α&gt; &amp; &quot;A&quot;.", fixed = TRUE)
+  expect_match(coefficientText,
+    "Regression time 0 means Clock &lt;day&gt; &amp; &quot;visit&quot; = 0", fixed = TRUE)
+  expect_match(endpointText,
+    "Endpoint times: Treatment &gt; β &amp; &#39;B&#39; = 218; Baseline &lt;α&gt; &amp; &quot;A&quot; = 158",
+    fixed = TRUE)
+  expect_false(grepl("<α>|<day>|&amp;lt;|&amp;quot;", coefficientText))
+  expect_false(grepl("<α>|&amp;lt;|&amp;#39;", endpointText))
+})
+
 test_that("repeated phase episodes are rejected before fitting any pooled model", {
   data <- .treatCompFixture()
   data$stage <- factor(rep(c("A", "B", "A", "C", "D"), each = 18L))

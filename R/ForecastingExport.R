@@ -39,7 +39,9 @@
   input <- if (identical(options[["inputType"]], "simulateData"))
     options[c("inputType", "noiseSd", "simArEffects", "simIEffect", "simMaEffects", "numSamples", "seed")] else
     options[c("inputType", "dependent", "time", "covariates")]
-  return(list(path = options[["forecastSave"]], input = input, model = model,
+  # Changed CSV naming makes a previously saved request pending, without
+  # changing the consumed button event or automatically rewriting the file.
+  return(list(formatVersion = 2L, path = options[["forecastSave"]], input = input, model = model,
               horizon = options[["forecastLength"]], data = dataset))
 }
 
@@ -63,7 +65,10 @@
       error <- result[["error"]]
       if (is.null(error) && !is.null(result[["predictions"]])) {
         exported <- result[["predictions"]]
-        names(exported)[names(exported) == "y"] <- .ln1ForeOutcomeLabel(options)
+        outcome <- .ln1ForeOutcomeLabel(options)
+        if (outcome %in% setdiff(names(exported), "y"))
+          outcome <- paste0(outcome, "_forecast")
+        names(exported)[names(exported) == "y"] <- outcome
         error <- tryCatch({ .ln1ForeWriteCsv(exported, path); NULL },
           error = function(e) conditionMessage(e), warning = function(w) conditionMessage(w))
         record[["status"]] <- if (is.null(error)) "success" else "failed"

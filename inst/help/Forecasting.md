@@ -8,6 +8,8 @@ Simulation returns exactly **N** observations. AR coefficients must define a sta
 
 **Automatic** specification uses the selected AICc, AIC or BIC criterion to compare candidate models, with KPSS tests as the default nonseasonal differencing rule. **Manual** specification uses the chosen p, d and q. The existing manual convention includes a mean when d = 0, drift when d = 1, and no constant when d > 1. The fitted-model note states the selected orders and whether a mean or drift was included.
 
+Coefficients and forecasts are withheld if the model does not converge, has too few used observations to estimate residual variance after accounting for freely estimated coefficients, or produces an invalid residual variance. Choose simpler orders or review the data in these cases. Forecasts with non-finite values or prediction bounds are also withheld and cannot be exported; review future predictor values or shorten the horizon. These checks detect computation failures, but passing them does not establish that a model is suitable or well calibrated.
+
 Without covariates, **Mean** is the undifferenced process mean. With covariates, **Intercept** is the regression intercept, accounting for ARIMA errors. **Drift** describes a linear trend. Coefficient standard errors come from the fitted model; p-values and confidence intervals use an approximate t reference with used observations minus estimated coefficients as degrees of freedom. This is not a validated small-sample correction. The results condition on the fitted model and do not adjust for automatic model selection.
 
 ## Interpret forecasts and intervals
@@ -56,6 +58,8 @@ Without covariates, forecasts use the outcome's history alone and do not require
 ## Export a CSV
 
 Choose a destination, then press **Export CSV / Save again**. Selecting a path, editing data or options, and reopening an analysis do not authorize a write. The button replaces an existing file at the selected destination. The export status reports whether the current forecasts were saved or whether changes are pending.
+
+The CSV uses `t` for time and `lower80`, `upper80`, `lower95`, and `upper95` for prediction bounds. The point forecast column uses the outcome's name. If that name matches one of these reserved headers, `_forecast` is appended to it (for example, outcome `upper95` becomes `upper95_forecast`). Other outcome names, including spaces and non-ASCII characters, are preserved.
 
 If an export fails, correct the input or destination and press the button again. Repairing a folder or forecast scenario does not retry automatically. The coefficient and forecast outputs remain available when a file write fails. In sandboxed JASP builds, use an accessible destination offered by the host file chooser.
 

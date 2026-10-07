@@ -21,7 +21,7 @@ test_that("legacy forecast states and displayed results are rebuilt with covaria
   options$forecastSave <- ""
 
   originalUpgrade <- getFromNamespace(".ln1ForeUpgradeState", "jaspLearnN1")
-  for (previousVersion in list(NULL, 3L)) {
+  for (previousVersion in list(NULL, 3L, 4L)) {
     recorded <- new.env(parent = emptyenv())
     recorded$called <- FALSE
     testthat::local_mocked_bindings(.ln1ForeUpgradeState = function(jaspResults) {
@@ -62,7 +62,7 @@ test_that("legacy forecast states and displayed results are rebuilt with covaria
     result <- jaspTools::runAnalysis("Forecasting", data, options, view = FALSE)
     expect_true(recorded$called)
     expect_true(all(recorded$cleared))
-    expect_identical(recorded$version, 4L)
+    expect_identical(recorded$version, 5L)
     expect_true(recorded$journalPreserved)
     expect_identical(result$status, "complete")
 

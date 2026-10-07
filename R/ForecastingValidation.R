@@ -39,3 +39,22 @@
     .quitAnalysis(gettext("Request between 1 and 10000 forecasts. This limit keeps the analysis responsive; it is not a statistical reliability threshold."))
   invisible(NULL)
 }
+
+.ln1ForeValidateFit <- function(fit) {
+  if (!.ln1ForeFiniteScalar(fit[["code"]]) || fit[["code"]] != 0)
+    .quitAnalysis(gettext("The ARIMA model did not converge. Choose simpler AR and MA orders or review the data before interpreting coefficients or forecasts."))
+
+  # forecast::Arima corrects its innovation variance using the number of
+  # freely estimated coefficients. Automatic constant models can have a
+  # fixed coefficient, so length(coef) is not the appropriate count.
+  estimated <- fit[["mask"]]
+  if (!is.logical(estimated) || anyNA(estimated) ||
+      length(estimated) != length(fit[["coef"]]) ||
+      !.ln1ForeWholeNumber(fit[["nobs"]], 1L))
+    .quitAnalysis(gettext("The ARIMA model did not provide valid estimation diagnostics. Choose simpler model orders or review the data."))
+  if (fit[["nobs"]] <= sum(estimated))
+    .quitAnalysis(gettext("There are too few observations for the selected ARIMA model to estimate its residual variance. Choose simpler model orders or provide more observed outcomes."))
+  if (!.ln1ForeFiniteScalar(fit[["sigma2"]]) || fit[["sigma2"]] < 0)
+    .quitAnalysis(gettext("The ARIMA model produced an invalid residual variance. Choose simpler model orders or review the data before interpreting coefficients or forecasts."))
+  invisible(NULL)
+}
